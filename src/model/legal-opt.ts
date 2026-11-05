@@ -3,7 +3,7 @@
 // DynoModel.withCurvePoint / withGearRatio so every result can be entered with
 // the in-game ECU / turbo / gear sliders.
 
-import { DynoModel, ECU_OFF, TURBO_OFF, type CurveKind, type Phys, type TuningRecord } from './dyno.js';
+import { DynoModel, ECU_OFF, SETUP_NAMES, TURBO_OFF, type CurveKind, type Phys, type TuningRecord } from './dyno.js';
 
 // ---- constants ---------------------------------------------------------------------------------
 
@@ -516,6 +516,8 @@ export interface BuildReportResult {
   cost: number;
   searchedCost: number;
   launch: { min: number; deficit: number; points: { rpm: number; pctOfStock: number }[] } | null;
+  /** Filled by runLegal: where the search started from and how many evaluations it used. */
+  search?: { from: string; evals: number; startCost: number };
 }
 
 export function buildReport(
@@ -651,4 +653,52 @@ export function formatSheet(
     L.push(`  replay dyno: ${fmtDyno(eo.replay.dyno)}`);
   }
   return L.join('\n');
+}
+
+
+// ---- runLegal: the whole CLI pipeline for one setup, as one pure call ----------------------------
+
+export interface LegalRunOptions {
+  /** Key of OBJECTIVES; defaults to the setup's own event (OBJ_BY_SETUP). */
+  objective?: string;
+  /** Fraction of stock (0..1) the lowest ECU points must keep; null/undefined = no launch variant. */
+  launchMin?: number | null;
+  nRandom?: number;
+  seed?: number;
+  maxIter?: number;
+}
+export interface LegalRun {
+  setup: number;
+  setupName: string;
+  objective: string;
+  car: string;
+  parts: PartsInfo;
+  start: { setupBytes: number[]; dyno: GameNumbers; cost: number };
+  plain: BuildReportResult;
+  launch: BuildReportResult | null;
+  launchMin: number | null;
+}
+
+/** Same work as tools/opt/legal_opt.mjs for one setup. Deterministic for a given seed. */
+export function runLegal(model: DynoModel, car: string, start: ArrayLike<number>, setup: number, o: LegalRunOptions = {}): LegalRun {
+  const objective = o.objective ?? OBJ_BY_SETUP[setup];
+  if (!OBJECTIVES[objective]) throw new Error(`unknown objective ${objective}`);
+  const startBytes = u8(start);
+  const opts = { nRandom: o.nRandom ?? 3, seed: o.seed ?? 1, maxIter: o.maxIter ?? 300 };
+  const plain = optimize(model, startBytes, objective, opts);
+  const startEv = new Evaluator(model, objective);
+  const plainReport = buildReport(model, plain.ev, startBytes, plain.bytes, null);
+  plainReport.search = { from: plain.from, evals: plain.evals, startCost: plain.startCost };
+  let launchReport: BuildReportResult | null = null;
+  const launchMin = o.launchMin ?? null;
+  if (launchMin !== null) {
+    const lp = optimize(model, startBytes, objective, { ...opts, launch: { min: launchMin } });
+    launchReport = buildReport(model, lp.ev, startBytes, lp.bytes, { min: launchMin });
+    launchReport.search = { from: lp.from, evals: lp.evals, startCost: lp.startCost };
+  }
+  return {
+    setup, setupName: SETUP_NAMES[setup], objective, car, parts: partsInfo(model),
+    start: { setupBytes: Array.from(startBytes), dyno: gameNumbers(model.evaluate(startBytes)), cost: startEv.cost(startBytes) },
+    plain: plainReport, launch: launchReport, launchMin,
+  };
 }
