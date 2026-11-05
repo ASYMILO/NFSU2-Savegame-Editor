@@ -93,7 +93,7 @@ export function EditorController($scope: EditorScope): void {
       carName: '', blocked: '', busy: false, rows: [], hasProposal: false,
       curveTabs: [], curve: 'ecu', cheat: false, point: 0, chart: null, gear: 0, drive: null, scalars: [],
       legalObjective: '', legalLaunch: false, legalSheet: '', legalCopied: false,
-      legalChoices: OBJ_BY_SETUP.map((key) => ({ key, name: OBJECTIVES[key].name })),
+      legalChoices: [{ key: '', name: 'Same as setup tab' }, ...OBJ_BY_SETUP.map((key) => ({ key, name: OBJECTIVES[key].name }))],
     },
   };
 
