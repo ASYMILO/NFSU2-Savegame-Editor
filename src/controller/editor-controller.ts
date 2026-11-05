@@ -23,6 +23,7 @@ import {
 import type {
   CategoryView, CurveChart, DynoCell, DynoRow, DynoTab, EditorScope, GearChart, PartView, SlotView, Status, TuningTab, UniquePartView, VisualRow,
 } from './editor-scope.js';
+import { formatSheet, OBJECTIVES, OBJ_BY_SETUP, runLegal } from '../model/legal-opt.js';
 
 const partsByIndex = new Map<number, PerfPart>(PERF_PARTS.map((p) => [p.index, p]));
 const tuningPerfIndexSet = new Set(TUNING_PERF_INDICES);
@@ -91,6 +92,8 @@ export function EditorController($scope: EditorScope): void {
       gameName: '', gameError: '', setup: 1, setupNames: SETUP_NAMES, strategy: '', optimizeGearing: false,
       carName: '', blocked: '', busy: false, rows: [], hasProposal: false,
       curveTabs: [], curve: 'ecu', cheat: false, point: 0, chart: null, gear: 0, drive: null, scalars: [],
+      legalObjective: '', legalLaunch: false, legalSheet: '', legalCopied: false,
+      legalChoices: OBJ_BY_SETUP.map((key) => ({ key, name: OBJECTIVES[key].name })),
     },
   };
 
@@ -517,6 +520,7 @@ export function EditorController($scope: EditorScope): void {
     $scope.tuning.tab = 'PERF';
     $scope.tuning.sub = TUNING_PERF_CATEGORIES[0].code;
     $scope.tuning.dyno.point = 0;
+    $scope.tuning.dyno.legalSheet = '';
     drafts.clear();
     visualDraft = null;
     rebuildTuning();
@@ -732,6 +736,7 @@ export function EditorController($scope: EditorScope): void {
 
   $scope.selectSetup = function (setup: DynoEvent): void {
     $scope.tuning.dyno.setup = setup;
+    $scope.tuning.dyno.legalSheet = '';
     rebuildDyno();
   };
 
@@ -760,6 +765,74 @@ export function EditorController($scope: EditorScope): void {
     }, 30);
   };
 
+  $scope.optimizeLegal = function (): void {
+    const view = $scope.tuning.dyno;
+    const built = dynoModel();
+    if ('reason' in built || view.busy) return;
+    const key = draftKey();
+    const objective = view.legalObjective || OBJ_BY_SETUP[view.setup];
+    const launchMin = view.legalLaunch ? 0.9 : null;
+    const start = currentSetup(built);
+    view.busy = true;
+    // Let the page paint the busy state before the search blocks the thread.
+    setTimeout(() => {
+      $scope.$apply(() => {
+        try {
+          const res = runLegal(built.model, view.carName, start, view.setup, { objective, launchMin });
+          if (draftKey() === key) {
+            const chosen = res.launch ?? res.plain;
+            const bytes = Uint8Array.from(chosen.setupBytes);
+            drafts.set(key, { bytes, band: built.model.tuningBand(bytes, view.setup) });
+            const title = `${view.carName}, ${SETUP_NAMES[view.setup]} setup, event ${OBJECTIVES[res.objective].name}`;
+            view.legalSheet = formatSheet(title, res);
+            if (sameBytes(bytes, start)) setStatus('success', 'Optimize found no better setup.');
+          }
+        } catch (err) {
+          setStatus('error', errorMessage(err));
+        }
+        view.busy = false;
+        rebuildDyno();
+      });
+    }, 30);
+  };
+
+  $scope.copyLegalSheet = function (): void {
+    const view = $scope.tuning.dyno;
+    const text = view.legalSheet;
+    if (!text) return;
+    const markCopied = (): void => {
+      setTimeout(() => {
+        $scope.$apply(() => { view.legalCopied = true; });
+        setTimeout(() => {
+          $scope.$apply(() => { view.legalCopied = false; });
+        }, 2000);
+      }, 0);
+    };
+    const fallback = (): void => {
+      const area = document.createElement('textarea');
+      area.value = text;
+      area.setAttribute('readonly', '');
+      area.style.position = 'fixed';
+      area.style.opacity = '0';
+      document.body.appendChild(area);
+      area.select();
+      let ok = false;
+      try {
+        ok = document.execCommand('copy');
+      } catch (_err) {
+        ok = false;
+      }
+      document.body.removeChild(area);
+      if (ok) markCopied();
+      else setTimeout(() => { $scope.$apply(() => setStatus('error', 'Copy failed. Select the sheet text and copy it manually.')); }, 0);
+    };
+    if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+      navigator.clipboard.writeText(text).then(markCopied, fallback);
+    } else {
+      fallback();
+    }
+  };
+
   $scope.applyDyno = function (): void {
     const built = dynoModel();
     const key = draftKey(), bytes = drafts.get(key)?.bytes;
@@ -774,10 +847,12 @@ export function EditorController($scope: EditorScope): void {
     drafts.delete(key);
     applyResult(setSetupTuning(data, slot, setup, bytes, gearing, scalars), true);
     setStatus('success', `Slot ${slot + 1}: ${SETUP_NAMES[setup]} ${parts || 'setup'} saved. Download to keep the changes.`);
+    $scope.tuning.dyno.legalSheet = '';
   };
 
   $scope.discardDyno = function (): void {
     drafts.delete(draftKey());
+    $scope.tuning.dyno.legalSheet = '';
     rebuildDyno();
   };
 

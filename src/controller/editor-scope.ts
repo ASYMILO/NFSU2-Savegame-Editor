@@ -164,6 +164,12 @@ export interface DynoView {
   gear: number;
   drive: GearChart | null;
   scalars: ScalarRow[];
+  /** Objective key for "Optimize (game rules)"; empty follows the selected setup tab. */
+  legalObjective: string;
+  legalLaunch: boolean;
+  legalSheet: string;
+  legalCopied: boolean;
+  legalChoices: { key: string; name: string }[];
 }
 
 /** Top-level tuning tab. */
@@ -252,6 +258,8 @@ export interface EditorScope extends angular.IScope {
   resetScalar(param: number): void;
   selectSetup(setup: DynoEvent): void;
   optimizeDyno(): void;
+  optimizeLegal(): void;
+  copyLegalSheet(): void;
   applyDyno(): void;
   discardDyno(): void;
   selectCurve(kind: DynoTab): void;

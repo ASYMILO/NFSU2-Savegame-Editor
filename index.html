@@ -241,6 +241,25 @@
             <button type="button" class="profile-action-btn" ng-click="optimizeDyno()" ng-disabled="tuning.dyno.busy">
               {{ tuning.dyno.busy ? 'Tuning…' : (tuning.dyno.optimizeGearing ? 'Auto-tune ECU, turbo &amp; gearing' : 'Auto-tune ECU &amp; turbo') }}
             </button>
+            <label>
+              Event
+              <select ng-model="tuning.dyno.legalObjective" ng-options="c.key as c.name for c in tuning.dyno.legalChoices" ng-disabled="tuning.dyno.busy">
+                <option value="">{{ tuning.dyno.legalChoices[tuning.dyno.setup].name }} (setup tab)</option>
+              </select>
+            </label>
+            <label>
+              <input type="checkbox" ng-model="tuning.dyno.legalLaunch" ng-disabled="tuning.dyno.busy">
+              Protect launch
+            </label>
+            <button type="button" class="profile-action-btn" ng-click="optimizeLegal()" ng-disabled="tuning.dyno.busy">
+              {{ tuning.dyno.busy ? 'Optimizing…' : 'Optimize (game rules)' }}
+            </button>
+          </div>
+          <div ng-if="tuning.dyno.legalSheet">
+            <strong>Game-rule setup (enter these in the game)</strong>
+            <p class="muted">Reset to default on the ECU, Turbo and Drivetrain screens first, then follow the numbered steps. Values are N*m bar heights as on the graph; the game moves neighbours each time, so after each step fix the column that is furthest from its value.</p>
+            <pre class="dyno-sheet">{{ tuning.dyno.legalSheet }}</pre>
+            <button type="button" class="profile-action-btn" ng-click="copyLegalSheet()">{{ tuning.dyno.legalCopied ? 'Copied' : 'Copy sheet' }}</button>
           </div>
           <p class="muted">{{ tuning.dyno.strategy }}</p>
           <p class="muted">Auto-tune builds usable power across the event's RPM band, not just peak horsepower, then refines shift recovery and performance. Band gains can trade off peak HP or straight-line times; review Saved / Edited before applying. Final refinement cannot worsen the resulting times or speeds. Event RPM targets are editor heuristics, not lap-time or drift simulations. Auto-tune uses independent save-only points regardless of the cheat checkbox.</p>
