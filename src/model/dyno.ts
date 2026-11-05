@@ -77,7 +77,7 @@ export interface CarRecord {
 
 interface PackageSub { item: number; fractions: number[] }
 interface Package { category: number; level: number; subs: PackageSub[] }
-interface TuningRecord {
+export interface TuningRecord {
   item: number; level: number; param: number; type: number; f8: number; fC: number;
   displayMin?: number; displayMax?: number;
 }
@@ -434,6 +434,9 @@ export class DynoModel {
   get gearingParameters(): number[] {
     return Array.from({ length: 7 }, (_, i) => i + 9).filter((param) => this.active(this.base, param));
   }
+
+  /** Read-only view of the best installed tuning record for each param (for partsInfo). */
+  get tuningRecords(): ReadonlyMap<number, TuningRecord> { return this.tuneRecords; }
 
   private fraction(cat: number, n: number): { f: number; out: number[] } {
     let out = new Array<number>(n).fill(0);
