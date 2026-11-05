@@ -2,7 +2,9 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
 import { DynoModel, findCar, parseGameData, type CurveKind } from '../model/dyno.js';
-import { curveLegality, defaultSetup, replayEdits, runLegal, type LegalRun } from '../model/legal-opt.js';
+import {
+  curveLegality, defaultSetup, neighbours, optimize, replayEdits, runLegal, shiftRetentionFloor, worstRetention, type LegalRun,
+} from '../model/legal-opt.js';
 
 // Cases come from the dyno-exactness fixture (car, installed parts, setup bytes; numbers only). The reference bytes were
 // recorded from runLegal, whose output equals the pre-port CLI (checked on a full profile via relay/baseline-circuit.txt).
@@ -80,4 +82,21 @@ test('legal optimizer is deterministic for a given seed', { skip: SKIP }, () => 
   const b = runLegal(model, car, c.setup, 0, { seed: 7 });
   assert.deepEqual(a.plain.setupBytes, b.plain.setupBytes);
   assert.deepEqual(a.plain.entryOrder, b.plain.entryOrder);
+});
+
+test('gear moves never open a shift hole below the reset-to-default retention floor', { skip: SKIP }, () => {
+  // Peugeot 106 with every non-visual performance package (six-speed unlocks all forward gears), no uniques.
+  const game = parseGameData(new Uint8Array(readFileSync(GAME_BUN)));
+  const installed = [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
+    1,1,1,1,1,1,1,0,1,0,0,1,0,0,1,0,0,1,0];
+  const { model } = open(game, { hash: 0x4b10070a, installed, uniques: new Array<number>(9).fill(0), setup: [] });
+  const start = defaultSetup(new Uint8Array(41).fill(100));
+  assert.equal(model.gearing(start)!.rows.length, 7, 'six gears and final drive unlocked');
+  const floor = shiftRetentionFloor(model, start);
+  assert.ok(floor > 0 && floor < 1, `floor ${floor}`);
+  const gearMoves = neighbours(model, start).filter((m) => m.desc.kind === 'gear' && m.desc.param !== 9);
+  assert.ok(gearMoves.length > 0, 'some gear moves remain');
+  for (const m of gearMoves) assert.ok(worstRetention(model, m.bytes) >= floor - 1e-6, `gear ${m.desc.param} -> ${m.desc.ratio}`);
+  const res = optimize(model, start, 'circuit', { nRandom: 0, maxIter: 40 });
+  assert.ok(worstRetention(model, res.bytes) >= floor - 1e-6, 'optimized gearbox keeps the floor');
 });

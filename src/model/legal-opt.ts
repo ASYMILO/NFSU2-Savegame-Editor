@@ -241,15 +241,50 @@ export function neighbours(model: DynoModel, s: Uint8Array): Move[] {
   }
   const gr = model.gearing(s);
   if (gr) {
+    const floor = shiftRetentionFloor(model, s);
+    const curWorst = worstRetention(model, s);
     for (const row of gr.rows) {
       const span = row.max - row.min;
       if (span <= 0) continue;
       const targets = [row.min, row.max];
       for (const pc of GEAR_PCTS) targets.push(row.ratio + span * pc / 100, row.ratio - span * pc / 100);
-      for (const t of targets) push({ kind: 'gear', param: row.param, ratio: t }, model.withGearRatio(s, row.param, t));
+      for (const t of targets) {
+        const bytes = model.withGearRatio(s, row.param, t);
+        // Forward-gear moves must not open a shift hole (see shiftRetentionFloor); final drive keeps every retention.
+        if (row.param !== 9) {
+          const w = worstRetention(model, bytes);
+          if (w < floor - 1e-6 && w < curWorst - 1e-6) continue;
+        }
+        push({ kind: 'gear', param: row.param, ratio: t }, bytes);
+      }
     }
   }
   return out;
+}
+
+/** Smallest rpm retention (next ratio / current ratio) over all forward shifts; 1 without shifts. */
+export function worstRetention(model: DynoModel, s: ArrayLike<number>): number {
+  const w = model.gearPowerWindows(s);
+  return w.length ? Math.min(...w.map((x) => x.retention)) : 1;
+}
+
+const retentionFloors = new WeakMap<DynoModel, number>();
+
+/**
+ * Editor policy, not a game rule (same as the Auto-tune gearing constraint in technical.md): every shift must keep
+ * at least min(worst, geometric mean) of the reset-to-default gearbox's rpm retention. Without it the dyno score
+ * favours gearboxes with a huge 1st-2nd drop, which only work on the straight-line dyno.
+ */
+export function shiftRetentionFloor(model: DynoModel, s: ArrayLike<number>): number {
+  let f = retentionFloors.get(model);
+  if (f === undefined) {
+    const neutral = u8(s);
+    for (let p = 9; p <= 15; p++) neutral[p] = 100;
+    const w = model.gearPowerWindows(neutral).map((x) => x.retention);
+    f = w.length ? Math.min(Math.min(...w), Math.exp(w.reduce((t, r) => t + Math.log(r), 0) / w.length)) : 0;
+    retentionFloors.set(model, f);
+  }
+  return f;
 }
 
 // ---- climb (private) ---------------------------------------------------------------------------
