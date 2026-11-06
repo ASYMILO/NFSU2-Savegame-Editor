@@ -257,48 +257,97 @@
           </div>
           <div class="dyno-controls">
             <strong>{{ tuning.dyno.carName }}</strong>
-            <label class="dyno-gearing">
-              <input type="checkbox" ng-model="tuning.dyno.optimizeGearing" ng-disabled="tuning.dyno.busy">
-              Optimize gearing &amp; shift spacing
-            </label>
-            <button type="button" class="profile-action-btn" ng-click="optimizeDyno()" ng-disabled="tuning.dyno.busy">
-              {{ tuning.dyno.busy ? 'Tuning…' : (tuning.dyno.optimizeGearing ? 'Auto-tune ECU, turbo &amp; gearing' : 'Auto-tune ECU &amp; turbo') }}
-            </button>
-            <label>
-              Event
-              <select ng-model="tuning.dyno.legalObjective" ng-options="c.key as c.name for c in tuning.dyno.legalChoices" ng-disabled="tuning.dyno.busy">
-              </select>
-            </label>
-            <label>
-              <input type="checkbox" ng-model="tuning.dyno.legalLaunch" ng-disabled="tuning.dyno.busy">
-              Protect launch
-            </label>
-            <span class="dyno-mode" role="radiogroup" aria-label="How do you enter the result?">
-              <label><input type="radio" name="dynomode" value="hand" ng-model="tuning.dyno.mode" ng-change="setMode('hand')" ng-disabled="tuning.dyno.busy"> A. By hand in the game (keys)</label>
-              <label><input type="radio" name="dynomode" value="save" ng-model="tuning.dyno.mode" ng-change="setMode('save')" ng-disabled="tuning.dyno.busy"> B. Write to the save (exact)</label>
-            </span>
-            <button type="button" class="profile-action-btn" ng-click="optimizeLegal()" ng-disabled="tuning.dyno.busy">
-              {{ tuning.dyno.busy ? 'Optimizing…' : 'Optimize (game rules)' }}
-            </button>
           </div>
-          <div ng-if="tuning.dyno.handTable.length">
-            <strong>By hand (A) against exact (B)</strong>
-            <table class="dyno-table dyno-ab">
-              <thead><tr><th></th><th>A. By hand</th><th>B. Exact</th><th>A minus B</th></tr></thead>
-              <tbody>
-                <tr ng-repeat="row in tuning.dyno.handTable track by row.label">
-                  <th scope="row">{{ row.label }}</th><td>{{ row.a }}</td><td>{{ row.b }}</td><td>{{ row.diff }}</td>
+          <section class="hand-card" aria-labelledby="hand-mode-title">
+            <h3 id="hand-mode-title">1. How do you put the result into the game?</h3>
+            <div class="hand-mode" role="radiogroup" aria-label="How do you put the result into the game?">
+              <label ng-class="{ on: tuning.dyno.mode === 'hand' }">
+                <input type="radio" name="dynomode" value="hand" ng-model="tuning.dyno.mode" ng-change="setMode('hand')" ng-disabled="tuning.dyno.busy">
+                <span class="hand-mode-name">A. By hand in the game</span>
+                <span class="hand-mode-note">You press the keys on the game's tuning screens. Only what the keys can reach.</span>
+              </label>
+              <label ng-class="{ on: tuning.dyno.mode === 'save' }">
+                <input type="radio" name="dynomode" value="save" ng-model="tuning.dyno.mode" ng-change="setMode('save')" ng-disabled="tuning.dyno.busy">
+                <span class="hand-mode-name">B. Write to the save</span>
+                <span class="hand-mode-note">The exact best setup, written as it is. Needs a loaded save to keep it.</span>
+              </label>
+            </div>
+          </section>
+          <section class="hand-card" aria-labelledby="hand-opt-title">
+            <h3 id="hand-opt-title">2. Let the editor find the engine setup</h3>
+            <div class="dyno-controls">
+              <label>Event
+                <select ng-model="tuning.dyno.legalObjective" ng-options="c.key as c.name for c in tuning.dyno.legalChoices" ng-disabled="tuning.dyno.busy"></select>
+              </label>
+              <label><input type="checkbox" ng-model="tuning.dyno.legalLaunch" ng-disabled="tuning.dyno.busy"> Protect launch</label>
+              <button type="button" class="profile-action-btn" ng-click="optimizeLegal()" ng-disabled="tuning.dyno.busy">
+                {{ tuning.dyno.busy ? 'Optimizing…' : 'Optimize (game rules)' }}
+              </button>
+            </div>
+            <details class="hand-older">
+              <summary>Older auto-tune (editor rules of thumb, not the game's rules)</summary>
+              <div class="dyno-controls">
+                <label class="dyno-gearing"><input type="checkbox" ng-model="tuning.dyno.optimizeGearing" ng-disabled="tuning.dyno.busy"> Optimize gearing &amp; shift spacing</label>
+                <button type="button" class="profile-action-btn" ng-click="optimizeDyno()" ng-disabled="tuning.dyno.busy">
+                  {{ tuning.dyno.busy ? 'Tuning…' : (tuning.dyno.optimizeGearing ? 'Auto-tune ECU, turbo &amp; gearing' : 'Auto-tune ECU &amp; turbo') }}
+                </button>
+              </div>
+              <p class="muted">Auto-tune builds usable power across the event's RPM band, not just peak horsepower, then refines shift recovery and performance. Band gains can trade off peak HP or straight-line times; review Saved / Edited before applying. Final refinement cannot worsen the resulting times or speeds. Event RPM targets are editor heuristics, not lap-time or drift simulations. Auto-tune uses independent save-only points regardless of the cheat checkbox.</p>
+            </details>
+          </section>
+          <section class="hand-card hand-result" ng-if="tuning.dyno.handTable.length" aria-labelledby="hand-res-title">
+            <h3 id="hand-res-title">3. What it gives on the dyno</h3>
+            <div class="hand-tiles">
+              <div class="hand-tile" ng-repeat="row in tuning.dyno.handTable track by row.label">
+                <span class="hand-tile-label">{{ row.label }}</span>
+                <span class="hand-tile-main" ng-class="{ pick: tuning.dyno.mode === 'hand' }"><small>A. By hand</small>{{ row.a }}</span>
+                <span class="hand-tile-main" ng-class="{ pick: tuning.dyno.mode === 'save' }"><small>B. Exact</small>{{ row.b }}</span>
+                <span class="hand-tile-diff" ng-class="{ zero: row.zero }"><small>A minus B</small>{{ row.diff }}</span>
+              </div>
+            </div>
+            <p class="muted" ng-if="tuning.dyno.mode === 'hand'">The keys need {{ tuning.dyno.handPresses }} presses in all. The draft below is A, so Apply stores the bytes the game would hold after those keys.</p>
+            <p class="muted" ng-if="tuning.dyno.mode === 'save'">Apply writes the exact bytes (B) to the save.</p>
+          </section>
+          <section class="hand-card" ng-if="tuning.dyno.sliderGroups.length" aria-labelledby="hand-sl-title">
+            <h3 id="hand-sl-title">4. Sliders: type the number you want</h3>
+            <p class="muted">The numbers are the ones the game shows. Leave "I want" empty to keep a value; a number you type counts as reached when the game screen shows it; type one more decimal than the screen shows to ask for that exact value. In A the editor finds the shortest keys (C, LEFT, RIGHT) from where the slider stands now.
+              <span ng-if="virtual.on">No save: type what each slider shows on your game screen now. If you are not sure, press C on that row in the game first: it then shows the value in the first box exactly, and the screen's two decimals can hide a byte or two.</span>
+              <button type="button" class="profile-action-btn hand-clear" ng-click="clearHandTargets()" ng-if="tuning.dyno.hasTargets" ng-disabled="tuning.dyno.busy">Clear my numbers</button></p>
+            <div class="hand-scroll">
+            <table class="dyno-table hand-sliders">
+              <thead><tr><th>Slider</th><th>{{ virtual.on ? 'On your screen now' : 'Now' }}</th><th>I want</th><th>A. By hand</th><th>B. Exact</th><th class="hand-keys-head">Keys for A</th></tr></thead>
+              <tbody ng-repeat="group in tuning.dyno.sliderGroups track by group.screen">
+                <tr class="hand-screen"><th colspan="6" scope="colgroup">{{ group.screen }}</th></tr>
+                <tr ng-repeat="row in group.rows track by row.param" ng-class="{ changed: row.changed }">
+                  <th scope="row">{{ row.label }}<small>{{ row.range }}</small></th>
+                  <td>
+                    <span ng-if="!virtual.on">{{ row.saved }}</span>
+                    <input ng-if="virtual.on" type="number" step="any" class="hand-input" ng-model="row.now" ng-model-options="{ debounce: 600 }"
+                           ng-change="setHandStart()" ng-disabled="tuning.dyno.busy" ng-attr-aria-label="Number {{ row.label }} shows on your game screen now">
+                  </td>
+                  <td><input type="number" step="any" class="hand-input" ng-model="row.input" ng-model-options="{ debounce: 600 }"
+                             ng-change="setHandTarget()" ng-disabled="tuning.dyno.busy" ng-attr-placeholder="{{ row.saved }}"
+                             ng-attr-aria-label="Wanted number for {{ row.label }}"></td>
+                  <td ng-class="{ pick: tuning.dyno.mode === 'hand' }">{{ row.byHand }}</td>
+                  <td ng-class="{ pick: tuning.dyno.mode === 'save' }">{{ row.exact }}</td>
+                  <td class="hand-keys">{{ row.keys || '–' }}<small ng-if="row.presses">{{ row.presses }} presses</small></td>
                 </tr>
               </tbody>
             </table>
-            <p class="muted" ng-if="tuning.dyno.mode === 'hand'">A is what the game's UP and DOWN keys reach: {{ tuning.dyno.handPresses }} key presses in all. The graph shows them under the bars: press C on the screen, then go through the bars from left to right. The draft below is A, so Apply stores the same bytes the game would hold.</p>
-            <p class="muted" ng-if="tuning.dyno.mode === 'save'">B is the exact optimum. Apply writes its bytes to the save; the game takes them as they are.</p>
-          </div>
-          <div ng-if="tuning.dyno.mode === 'hand' && tuning.dyno.handSheet">
-            <strong>Keys to press in the game</strong>
-            <pre class="dyno-sheet">{{ tuning.dyno.handSheet }}</pre>
-            <button type="button" class="profile-action-btn" ng-click="copyLegalSheet()">{{ tuning.dyno.legalCopied ? 'Copied' : 'Copy sheet' }}</button>
-          </div>
+            </div>
+          </section>
+          <section class="hand-card" ng-if="tuning.dyno.mode === 'hand' && tuning.dyno.handSteps.length" aria-labelledby="hand-keys-title">
+            <h3 id="hand-keys-title">5. Keys to press in the game</h3>
+            <table class="dyno-table hand-steps">
+              <thead><tr><th>#</th><th>Screen</th><th>Row</th><th class="hand-keys-head">Press</th><th>Shows</th></tr></thead>
+              <tbody>
+                <tr ng-repeat="step in tuning.dyno.handSteps track by $index">
+                  <td>{{ $index + 1 }}</td><td>{{ step.screen }}</td><td>{{ step.row }}</td><td class="hand-keys">{{ step.keys }}</td><td>{{ step.result || '–' }}</td>
+                </tr>
+              </tbody>
+            </table>
+            <button type="button" class="profile-action-btn" ng-click="copyLegalSheet()">{{ tuning.dyno.legalCopied ? 'Copied' : 'Copy the full key sheet' }}</button>
+          </section>
           <div ng-if="tuning.dyno.mode === 'save' && tuning.dyno.legalSheet">
             <strong>Exact setup (B)</strong>
             <p class="muted">Apply writes these bytes to the save. The sheet shows how the same bars could be set by value on the game's graph (Reset to default on ECU and Turbo first, then the numbered steps; the game moves neighbours each time, so after each step fix the column that is furthest from its value).</p>
@@ -306,7 +355,6 @@
             <button type="button" class="profile-action-btn" ng-click="copyLegalSheet()">{{ tuning.dyno.legalCopied ? 'Copied' : 'Copy sheet' }}</button>
           </div>
           <p class="muted">{{ tuning.dyno.strategy }}</p>
-          <p class="muted">Auto-tune builds usable power across the event's RPM band, not just peak horsepower, then refines shift recovery and performance. Band gains can trade off peak HP or straight-line times; review Saved / Edited before applying. Final refinement cannot worsen the resulting times or speeds. Event RPM targets are editor heuristics, not lap-time or drift simulations. Auto-tune uses independent save-only points regardless of the cheat checkbox.</p>
           <p class="muted" ng-if="tuning.dyno.optimizeGearing">
             Balances every shift's power band and RPM spacing for the selected event.
           </p>

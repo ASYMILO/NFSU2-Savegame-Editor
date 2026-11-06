@@ -181,10 +181,37 @@ export interface DynoView {
   /** Mode A against mode B on the dyno screen's numbers; empty before Optimize. */
   handTable: HandRow[];
   handPresses: number;
+  /** Mode A key list. */
+  handSteps: { screen: string; row: string; keys: string; result: string; presses: number }[];
+  /** Number sliders of the game's menus for this car, grouped by screen. */
+  sliderGroups: SliderGroup[];
+  /** True when an owner-typed number is set on any slider of this setup. */
+  hasTargets: boolean;
 }
 
+/** One number slider as the game shows it, with the owner's wanted number and both ways to get there. */
+export interface SliderView {
+  param: number;
+  label: string;
+  /** Number on the game screen now (saved setup). */
+  saved: string;
+  /** No-save mode: the number the owner says the game screen shows now (the start of the keys); editable. */
+  now: number | null;
+  /** Edge numbers of the slider and the size of one key press. */
+  range: string;
+  /** Wanted number typed by the owner (null = leave as is). */
+  input: number | null;
+  /** B: the number the exact byte stands for; A: what the keys reach, with the keys. */
+  exact: string;
+  byHand: string;
+  keys: string;
+  presses: number;
+  changed: boolean;
+}
+export interface SliderGroup { screen: string; rows: SliderView[] }
+
 /** One line of the A against B table. */
-export interface HandRow { label: string; a: string; b: string; diff: string }
+export interface HandRow { label: string; a: string; b: string; diff: string; zero: boolean }
 
 /** "Without a save": car and part levels picked from lists. */
 export interface VirtualView {
@@ -279,6 +306,9 @@ export interface EditorScope extends angular.IScope {
   changeVirtual(): void;
   openVirtualTuning(): void;
   setMode(mode: 'hand' | 'save'): void;
+  setHandTarget(): void;
+  setHandStart(): void;
+  clearHandTargets(): void;
   editVisual(row: VisualRow): void;
   applyVisual(): void;
   discardVisual(): void;

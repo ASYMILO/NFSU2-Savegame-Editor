@@ -21,10 +21,11 @@ import {
   type CurveKind, type CurvePoint, type DynoEvent, type DynoResult, type GameData, type Gearing, type ScalarRow, type TuningBand,
 } from '../model/dyno.js';
 import type {
-  CategoryView, CurveChart, DynoCell, DynoRow, DynoTab, EditorScope, GearChart, HandRow, PartView, SlotView, Status, TuningTab, UniquePartView, VisualRow,
+  CategoryView, CurveChart, DynoCell, DynoRow, DynoTab, EditorScope, GearChart, HandRow, PartView, SliderGroup, SliderView, SlotView, Status, TuningTab, UniquePartView, VisualRow,
 } from './editor-scope.js';
 import { formatSheet, OBJECTIVES, OBJ_BY_SETUP, runLegal } from '../model/legal-opt.js';
-import { formatHandPlan, planHandInput, type HandInputPlan } from '../model/hand-input.js';
+import { formatHandPlan, handSteps, planHandInput, ROW_LABELS, ROW_ORDER, shownText, type HandInputPlan } from '../model/hand-input.js';
+import { NitroScreen, rowInfo, rowScale, setRowShown } from '../model/tune-keys.js';
 import { buildVirtualSave, installedForLevels, PART_LEVEL_CATEGORIES } from '../model/virtual-save.js';
 
 const partsByIndex = new Map<number, PerfPart>(PERF_PARTS.map((p) => [p.index, p]));
@@ -96,12 +97,17 @@ export function EditorController($scope: EditorScope): void {
       curveTabs: [], curve: 'ecu', cheat: false, point: 0, chart: null, gear: 0, drive: null, scalars: [],
       legalObjective: '', legalLaunch: false, legalSheet: '', legalCopied: false,
       legalChoices: [{ key: '', name: 'Same as setup tab' }, ...OBJ_BY_SETUP.map((key) => ({ key, name: OBJECTIVES[key].name }))],
-      mode: 'hand', handSheet: '', handTable: [], handPresses: 0,
+      mode: 'hand', handSheet: '', handTable: [], handPresses: 0, handSteps: [], sliderGroups: [], hasTargets: false,
     },
   };
   $scope.virtual = { on: false, cars: [], carHash: 0, levels: [] };
-  /** Last Optimize: mode B's optimum and mode A's plan for one slot and setup. */
-  let handResult: { key: string; optimum: Uint8Array; plan: HandInputPlan } | null = null;
+  /**
+   * Mode B's setup and mode A's plan for one slot and setup. `base` is the optimizer's result (or the saved setup), `optimum` is
+   * the base with the numbers the owner typed for sliders written in.
+   */
+  let handResult: { key: string; base: Uint8Array; optimum: Uint8Array; plan: HandInputPlan } | null = null;
+  /** Numbers typed for sliders, as the game shows them, per slot and setup. */
+  const handTargets = new Map<string, Map<number, number>>();
 
   fetch('./car-donors.json')
     .then((res) => {
@@ -239,7 +245,7 @@ export function EditorController($scope: EditorScope): void {
 
   function clearSheets(): void {
     const view = $scope.tuning.dyno;
-    view.legalSheet = ''; view.handSheet = ''; view.handTable = []; view.handPresses = 0;
+    view.legalSheet = ''; view.handSheet = ''; view.handTable = []; view.handPresses = 0; view.handSteps = [];
     handResult = null;
   }
 
@@ -326,12 +332,17 @@ export function EditorController($scope: EditorScope): void {
     view.chart = null;
     view.drive = null;
     view.scalars = [];
+    view.sliderGroups = [];
     const built = dynoModel();
     if ('reason' in built) {
       view.blocked = built.reason;
       return;
     }
     view.blocked = '';
+    // typed slider numbers survive a change of setup tab or of the loaded car: the plan is rebuilt from them
+    if (!handResult || handResult.key !== draftKey()) refreshHand(built);
+    view.sliderGroups = buildSliders(built);
+    view.hasTargets = !!handTargets.get(draftKey())?.size;
     view.carName = built.model.car.name;
     const saved = built.setups[view.setup], bytes = currentSetup(built);
     const band = drafts.get(draftKey())?.band ?? built.model.tuningBand(bytes, view.setup);
@@ -374,6 +385,7 @@ export function EditorController($scope: EditorScope): void {
 
   function resetEditor(): void {
     handResult = null;
+    handTargets.clear();
     drafts.clear();
     visualDraft = null;
     $scope.tuning.open = false;
@@ -739,6 +751,7 @@ export function EditorController($scope: EditorScope): void {
   function rebuildVirtualSave(): void {
     const v = $scope.virtual;
     if (!v.carHash) return;
+    handTargets.clear();
     const levels = Object.fromEntries(v.levels.map((l) => [l.code, l.value]));
     applyResult(buildVirtualSave(v.carHash, installedForLevels(levels)));
   }
@@ -863,16 +876,11 @@ export function EditorController($scope: EditorScope): void {
           if (draftKey() === key) {
             const chosen = res.launch ?? res.plain;
             const optimum = Uint8Array.from(chosen.setupBytes);
-            // Mode A: what the game's keys can reach from the saved setup (the Drivetrain keeps your value: no Reset there).
-            const plan = planHandInput(built.model, start, optimum, view.setup, objective);
-            handResult = { key, optimum, plan };
             const title = `${view.carName}, ${SETUP_NAMES[view.setup]} setup, event ${OBJECTIVES[res.objective].name}`;
             view.legalSheet = formatSheet(title, res);
-            view.handSheet = formatHandPlan(plan, view.setup);
-            view.handTable = handTable(plan);
-            view.handPresses = plan.presses;
-            const bytes = view.mode === 'hand' ? plan.setup : optimum;
-            drafts.set(key, { bytes, band: built.model.tuningBand(bytes, view.setup) });
+            // Mode A: what the game's keys can reach from the saved setup (no Reset on the Drivetrain: it costs 9.7 km/h on the 3000GT).
+            refreshHand(built, optimum);
+            const bytes = drafts.get(key)?.bytes ?? built.setups[view.setup];
             if (sameBytes(bytes, start)) setStatus('success', 'Optimize found no better setup.');
           }
         } catch (err) {
@@ -884,15 +892,123 @@ export function EditorController($scope: EditorScope): void {
     }, 30);
   };
 
+  /**
+   * Plans mode A and sets mode B for the selected setup: the base (the optimizer's result, else the saved bytes) with the
+   * owner's typed slider numbers written in. The draft follows the chosen mode.
+   */
+  function refreshHand(built: { model: DynoModel; setups: Uint8Array[] }, base?: Uint8Array): void {
+    const view = $scope.tuning.dyno, key = draftKey(), saved = built.setups[view.setup];
+    const baseBytes = base ?? (handResult && handResult.key === key ? handResult.base : saved);
+    const targets = handTargets.get(key) ?? new Map<number, number>();
+    let optimum: Uint8Array = Uint8Array.from(baseBytes);
+    for (const [param, shown] of targets) optimum = setRowShown(built.model, optimum, param, shown) ?? optimum;
+    if (sameBytes(optimum, saved)) {
+      handResult = null;
+      view.handSheet = ''; view.handTable = []; view.handPresses = 0; view.handSteps = [];
+      if (base !== undefined || targets.size) drafts.delete(key);
+      return;
+    }
+    const objective = view.legalObjective || OBJ_BY_SETUP[view.setup];
+    const decimals = (n: number): number => (String(n).split('.')[1] ?? '').length;
+    const exact = [...targets].filter(([param, n]) => decimals(n) > (param >= 10 && param <= 15 ? 1 : 2)).map(([param]) => param);
+    const plan = planHandInput(built.model, saved, optimum, view.setup, objective, targets.keys(), exact);
+    handResult = { key, base: baseBytes, optimum, plan };
+    view.handSheet = formatHandPlan(plan, view.setup);
+    view.handTable = handTable(plan);
+    view.handPresses = plan.presses;
+    view.handSteps = handSteps(plan);
+    const bytes = view.mode === 'hand' ? plan.setup : optimum;
+    drafts.set(key, { bytes, band: built.model.tuningBand(bytes, view.setup) });
+  }
+
+  /** The number sliders of the game's menus that this car has, with saved number, typed number, and both ways to the target. */
+  function buildSliders(built: { model: DynoModel; setups: Uint8Array[] }): SliderGroup[] {
+    const view = $scope.tuning.dyno, key = draftKey(), saved = built.setups[view.setup];
+    const targets = handTargets.get(key), res = handResult && handResult.key === key ? handResult : null;
+    const groups = new Map<string, SliderView[]>();
+    const digits = (param: number): number => (param >= 10 && param <= 15 ? 1 : 2);
+    const fmt = (v: number, param: number): string => (Math.abs(v) >= 100 ? v.toFixed(1) : v.toFixed(digits(param)));
+    for (const param of ROW_ORDER) {
+      let range: string;
+      if (param === 16) {
+        const n = NitroScreen.open(built.model, saved);
+        if (!n) continue;
+        const sc = n.scale;
+        range = `${sc.min.toFixed(1)} – ${sc.max.toFixed(1)} s, key ±${Number(sc.step.toPrecision(2))} s (power goes the other way)`;
+      } else {
+        const info = rowInfo(built.model, saved, param);
+        if (!info) continue;
+        const sc = rowScale(info);
+        range = `${fmt(sc.min, param)} – ${fmt(sc.max, param)}, key ±${Number(sc.step.toPrecision(2))}`;
+      }
+      const [screen, label] = ROW_LABELS[param];
+      const mine = res?.plan.plans.filter((p) => p.row?.param === param || (param === 9 && p.id === 'finalDrive')) ?? [];
+      const steps = res ? handSteps({ ...res.plan, plans: mine }) : [];
+      const savedText = shownText(built.model, saved, param);
+      const exact = res ? shownText(built.model, res.optimum, param) : savedText;
+      const byHand = res ? shownText(built.model, res.plan.setup, param) : savedText;
+      const rows = groups.get(screen) ?? [];
+      rows.push({
+        param, label, saved: savedText, now: Number.isFinite(Number(savedText)) ? Number(savedText) : null, range, input: targets?.get(param) ?? null, exact, byHand,
+        keys: steps.map((x) => x.keys).join('; then '), presses: mine.reduce((n, p) => n + p.presses, 0),
+        changed: !!res && (res.optimum[param] !== saved[param] || res.plan.setup[param] !== saved[param]),
+      });
+      groups.set(screen, rows);
+    }
+    return [...groups].map(([screen, rows]) => ({ screen, rows }));
+  }
+
+  $scope.setHandTarget = function (): void {
+    const built = dynoModel();
+    if ('reason' in built || $scope.tuning.dyno.busy) return;
+    const key = draftKey(), targets = new Map<number, number>();
+    for (const group of $scope.tuning.dyno.sliderGroups) {
+      for (const row of group.rows) if (typeof row.input === 'number' && Number.isFinite(row.input)) targets.set(row.param, row.input);
+    }
+    if (targets.size) handTargets.set(key, targets); else handTargets.delete(key);
+    refreshHand(built);
+    rebuildDyno();
+  };
+
+  /**
+   * No-save mode: the keys start from what the game screen shows now, which the owner types (default: the value after key C).
+   * It is written into the in-memory save, so the planner, the dyno table and Apply all start from it.
+   */
+  $scope.setHandStart = function (): void {
+    const built = dynoModel();
+    if (!$scope.virtual.on || !data || 'reason' in built || $scope.tuning.dyno.busy) return;
+    const view = $scope.tuning.dyno;
+    let bytes: Uint8Array = Uint8Array.from(built.setups[view.setup]);
+    for (const group of view.sliderGroups) {
+      for (const row of group.rows) {
+        if (typeof row.now !== 'number' || !Number.isFinite(row.now) || row.now === Number(row.saved)) continue;
+        bytes = setRowShown(built.model, bytes, row.param, row.now) ?? bytes;
+      }
+    }
+    if (sameBytes(bytes, built.setups[view.setup])) return;
+    applyResult(setSetupTuning(data, $scope.tuning.slot, view.setup, bytes, true, true), true);
+    drafts.delete(draftKey());
+    clearSheets();
+    rebuildDyno();
+  };
+
+  $scope.clearHandTargets = function (): void {
+    handTargets.delete(draftKey());
+    const built = dynoModel();
+    if (!('reason' in built)) refreshHand(built);
+    rebuildDyno();
+  };
+
   /** The A against B table in the dyno screen's formats. */
   function handTable(plan: HandInputPlan): HandRow[] {
     const sec = (v: number | null): string => (v === null ? '-' : `${v.toFixed(2)} s`);
     const d = (v: number | null, unit: string, digits = 2): string => (v === null ? '-' : `${v > 0 ? '+' : ''}${v.toFixed(digits)} ${unit}`);
+    const z = (v: number | null): boolean => v === null || Math.abs(v) < 0.005;
     return [
-      { label: '0–60 mph', a: sec(plan.a.t60), b: sec(plan.b.t60), diff: d(plan.diff.t60, 's') },
-      { label: '0–100 mph', a: sec(plan.a.t100), b: sec(plan.b.t100), diff: d(plan.diff.t100, 's') },
-      { label: 'Top speed', a: `${plan.a.topKmh.toFixed(1)} km/h`, b: `${plan.b.topKmh.toFixed(1)} km/h`, diff: d(plan.diff.topKmh, 'km/h', 1) },
-      { label: 'Power', a: `${plan.a.powerBhp.toFixed(1)} bhp`, b: `${plan.b.powerBhp.toFixed(1)} bhp`, diff: d(plan.diff.powerBhp, 'bhp', 1) },
+      { label: '0–60 mph', a: sec(plan.a.t60), b: sec(plan.b.t60), diff: d(plan.diff.t60, 's'), zero: z(plan.diff.t60) },
+      { label: '0–100 mph', a: sec(plan.a.t100), b: sec(plan.b.t100), diff: d(plan.diff.t100, 's'), zero: z(plan.diff.t100) },
+      { label: 'Top speed', a: `${plan.a.topKmh.toFixed(1)} km/h`, b: `${plan.b.topKmh.toFixed(1)} km/h`, diff: d(plan.diff.topKmh, 'km/h', 1), zero: Math.abs(plan.diff.topKmh) < 0.05 },
+      { label: 'Power', a: `${plan.a.powerBhp.toFixed(1)} bhp`, b: `${plan.b.powerBhp.toFixed(1)} bhp`, diff: d(plan.diff.powerBhp, 'bhp', 1), zero: Math.abs(plan.diff.powerBhp) < 0.05 },
     ];
   }
 
@@ -959,11 +1075,13 @@ export function EditorController($scope: EditorScope): void {
     drafts.delete(key);
     applyResult(setSetupTuning(data, slot, setup, bytes, gearing, scalars), true);
     setStatus('success', `Slot ${slot + 1}: ${SETUP_NAMES[setup]} ${parts || 'setup'} saved. Download to keep the changes.`);
+    handTargets.delete(key);
     clearSheets();
   };
 
   $scope.discardDyno = function (): void {
     drafts.delete(draftKey());
+    handTargets.delete(draftKey());
     clearSheets();
     rebuildDyno();
   };

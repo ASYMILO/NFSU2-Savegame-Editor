@@ -35,7 +35,11 @@ export interface SliderPlan {
 }
 
 /** What a planner may know besides the setups: which rows the owner typed a number for (they are not the optimizer's). */
-export interface PlanContext { manual: ReadonlySet<number> }
+export interface PlanContext {
+  manual: ReadonlySet<number>;
+  /** Typed with more decimals than the screen shows: that exact byte is wanted, not any byte that reads the same. */
+  exact: ReadonlySet<number>;
+}
 
 export type SliderPlanner = (model: DynoModel, current: Uint8Array, target: Uint8Array, objective: string, ctx: PlanContext) => SliderPlan | null;
 
@@ -212,23 +216,29 @@ function runsOf(keys: Key[]): number[] {
  * the row at byte 100); RIGHT and LEFT, bouncing off both ends of the box (the reachable grid shifts at an end).
  * @param slack Bytes the result may be away from `targetByte`; among those the fewest presses win (C counts as one).
  * @param useC 'auto' tries both starts, 'never' only the value you have, 'only' only key C.
+ * @param sameShown The target counts as reached by every byte whose number on the screen reads the same (the screen shows
+ *   two decimals, gears one, so a few bytes show one number); among those the fewest presses win.
  * @returns null when the row is locked.
  */
 export function routeToByte(model: DynoModel, setup: ArrayLike<number>, param: number, targetByte: number,
-  slack = 0, useC: 'auto' | 'never' | 'only' = 'auto'): Route | null {
+  slack = 0, useC: 'auto' | 'never' | 'only' = 'auto', sameShown = false): Route | null {
   const info = rowInfo(model, setup, param);
   if (!info) return null;
+  const digits = param >= 10 && param <= 15 ? 1 : 2;
+  const text = (b: number): string => rowShown(info, b).toFixed(digits);
+  const wanted = text(targetByte);
   const starts: { st: RowState; c: boolean }[] = [];
   if (useC !== 'only') starts.push({ st: openRow(model, setup), c: false });
   if (useC !== 'never') starts.push({ st: resetRow(model, setup, param), c: true });
-  let best: { route: Route; d: number } | null = null;
+  let best: { route: Route; d: number; dd: number } | null = null;
   for (const { st, c } of starts) {
     for (const node of walk(model, info, st).values()) {
-      const d = Math.abs(node.st.setup[param] - targetByte);
+      const b = node.st.setup[param];
+      const dd = Math.abs(b - targetByte), d = sameShown && text(b) === wanted ? 0 : dd;
       const route: Route = { useC: c, runs: runsOf(node.keys), presses: node.keys.length + (c ? 1 : 0), setup: node.st.setup };
       const off = (x: number): number => (x > slack ? x : 0);
       if (!best || off(d) < off(best.d) || (off(d) === off(best.d) && (route.presses < best.route.presses
-        || (route.presses === best.route.presses && (d < best.d || (d === best.d && !route.useC && best.route.useC)))))) best = { route, d };
+        || (route.presses === best.route.presses && (dd < best.dd || (dd === best.dd && !route.useC && best.route.useC)))))) best = { route, d, dd };
     }
   }
   return best?.route ?? null;
@@ -262,7 +272,7 @@ function routeNitro(model: DynoModel, setup: ArrayLike<number>, targetByte: numb
 }
 
 /** The number a screen shows, as text (gears show one decimal, the rest two). */
-function shownText(model: DynoModel, setup: ArrayLike<number>, param: number): string {
+export function shownText(model: DynoModel, setup: ArrayLike<number>, param: number): string {
   if (param === 16) {
     const n = NitroScreen.open(model, setup);
     return n ? n.secondsOf(setup[16]).toFixed(2) : '-';
@@ -273,7 +283,7 @@ function shownText(model: DynoModel, setup: ArrayLike<number>, param: number): s
 
 /**
  * One planner per number slider: the shortest key path (or key C and then keys) from the value on the screen to the target
- * byte, within {@link SLACK_BYTES}. Gears get a second round (a gear key pushes its neighbours away from where they were set).
+ * byte, within {@link SLACK_BYTES} (exact for numbers the owner typed). Gears get a second round (a gear key pushes its neighbours away from where they were set).
  * Rows nobody wants to change cost no key. The final drive is left to {@link finalDrivePlanner} unless the owner typed it.
  */
 export function rowPlanner(param: number, again = false): SliderPlanner {
@@ -281,7 +291,9 @@ export function rowPlanner(param: number, again = false): SliderPlanner {
     if (param === 9 && !ctx.manual.has(9)) return null;
     const pair = param === 16 ? [16, 17] : [param];
     if (pair.every((i) => current[i] === target[i])) return null;
-    const route = param === 16 ? routeNitro(model, current, target[16], SLACK_BYTES) : routeToByte(model, current, param, target[param], SLACK_BYTES);
+    // a number the owner typed is reached when the screen shows it (any byte that reads the same); the optimizer's own rows may stop a byte short
+    const slack = ctx.manual.has(param) ? 0 : SLACK_BYTES;
+    const route = param === 16 ? routeNitro(model, current, target[16], slack) : routeToByte(model, current, param, target[param], slack, 'auto', ctx.manual.has(param) && !ctx.exact.has(param));
     if (!route || route.presses === 0) return null;
     // the key path of an unlocked row only; nothing to do when the best path ends where it started
     if (pair.every((i) => route.setup[i] === current[i]) && !route.useC) return null;
@@ -308,10 +320,11 @@ export const SLIDER_PLANNERS: SliderPlanner[] = [curvePlanner('ecu'), curvePlann
  * @param saved Setup bytes in the save (what the screens start from, except where key C is used).
  * @param optimum Mode B: the exact optimum from runLegal, plus the numbers the owner typed for sliders.
  * @param manual Sliders (params) whose target the owner typed: they get the nearest-number path, not the optimizer's choice.
+ * @param exact Those among them typed with more decimals than the screen shows (a byte, not a number on the screen).
  */
 export function planHandInput(model: DynoModel, saved: Uint8Array, optimum: Uint8Array, setupIndex: number, objective?: string,
-  manual: Iterable<number> = []): HandInputPlan {
-  const obj = objective ?? OBJ_BY_SETUP[setupIndex], ctx: PlanContext = { manual: new Set(manual) };
+  manual: Iterable<number> = [], exact: Iterable<number> = []): HandInputPlan {
+  const obj = objective ?? OBJ_BY_SETUP[setupIndex], ctx: PlanContext = { manual: new Set(manual), exact: new Set(exact) };
   let setup: Uint8Array = Uint8Array.from(saved);
   const plans: SliderPlan[] = [];
   for (const planner of SLIDER_PLANNERS) {
@@ -354,4 +367,31 @@ export function formatHandPlan(plan: HandInputPlan, setupIndex: number): string 
   L.push('', `${plan.presses} key presses in total.`, `By hand (A)   : ${f(plan.a)}`, `Exact (B)     : ${f(plan.b)}`,
     `A minus B     : 0-60 ${plan.diff.t60 ?? '-'} s | 0-100 ${plan.diff.t100 ?? '-'} s | top ${plan.diff.topKmh} km/h | power ${plan.diff.powerBhp} bhp`);
   return L.join('\n');
+}
+
+/** One line of the key list: what to do on which screen, and where it ends. */
+export interface HandStep { screen: string; row: string; keys: string; result: string; presses: number }
+
+const runText = (runs: number[]): string => runs.map((n) => `${n > 0 ? 'RIGHT' : 'LEFT'} ×${Math.abs(n)}`).join(', then ') || 'no key';
+/** `C` first when the path starts with it, then the runs ("C" alone when key C already lands on the value). */
+const keyText = (c: boolean, runs: number[]): string => (c ? ['C', ...(runs.length ? [runText(runs)] : [])].join(', then ') : runText(runs));
+
+/** The plan as a short list (the long text for copying is {@link formatHandPlan}). */
+export function handSteps(plan: HandInputPlan): HandStep[] {
+  return plan.plans.map((p) => {
+    if (p.row) {
+      const runs = p.passes.map((r) => r[0]).filter(Boolean);
+      return {
+        screen: p.screen, row: p.row.label, presses: p.presses, result: `${p.row.reached}${p.row.again ? ' (second round)' : ''}`,
+        keys: keyText(p.start === 'C', runs),
+      };
+    }
+    if (p.id === 'finalDrive') {
+      return { screen: p.screen, row: 'Final Drive Ratio', presses: p.presses, result: '', keys: keyText(p.start === 'C', p.passes.map((r) => r[0]).filter(Boolean)) };
+    }
+    return {
+      screen: p.screen, row: 'bars, left to right', presses: p.presses, result: '',
+      keys: `C, then the bars (counts are under the bars on the graph; ${p.passes.length} round${p.passes.length > 1 ? 's' : ''})`,
+    };
+  });
 }

@@ -442,3 +442,39 @@ body {
 .dyno-mode { display: inline-flex; flex-wrap: wrap; gap: 12px; padding: 4px 10px; border: 1px solid var(--color-border); }
 .dyno-press { fill: var(--color-text-strong); font-size: 12px; font-weight: 600; font-family: inherit; }
 .dyno-ab td, .dyno-ab th { white-space: nowrap; }
+
+/* Hand input (mode A / B): numbered cards, big result tiles, one table for the sliders. */
+.hand-card { margin: 0 0 14px; padding: 12px 14px; border: 1px solid var(--color-border); border-radius: 8px; background: rgba(255, 255, 255, .02); }
+.hand-card h3 { margin: 0 0 10px; font-size: 14px; letter-spacing: .03em; color: var(--color-text-strong); font-weight: 600; }
+.hand-mode { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 10px; }
+.hand-mode label { display: grid; grid-template-columns: 20px 1fr; column-gap: 8px; padding: 10px 12px; border: 1px solid var(--color-border); border-radius: 8px; cursor: pointer; margin: 0; }
+.hand-mode label.on { border-color: var(--color-primary); background: var(--color-elevated); box-shadow: inset 3px 0 0 var(--color-primary); }
+.hand-mode input { grid-row: 1 / span 2; margin-top: 3px; accent-color: var(--color-primary); }
+.hand-mode-name { font-weight: 600; color: var(--color-text-strong); }
+.hand-mode-note { font-size: 12px; color: var(--color-text-muted); }
+.hand-older { margin-top: 8px; }
+.hand-older summary { cursor: pointer; color: var(--color-text-muted); font-size: 12px; }
+.hand-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; }
+.hand-tile { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 10px; padding: 10px 12px; border: 1px solid var(--color-border); border-radius: 8px; font-variant-numeric: tabular-nums; }
+.hand-tile-label { grid-column: 1 / -1; font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--color-text-muted); }
+.hand-tile small { display: block; font-size: 11px; color: var(--color-text-muted); letter-spacing: 0; }
+.hand-tile-main { font-size: 18px; color: var(--color-text); }
+.hand-tile-main.pick { color: var(--color-text-strong); font-weight: 700; }
+.hand-tile-diff { grid-column: 1 / -1; font-size: 13px; padding-top: 4px; border-top: 1px solid var(--color-border); color: var(--color-text-strong); }
+.hand-tile-diff.zero { color: var(--color-green); }
+.hand-scroll { overflow-x: auto; }
+.hand-sliders th, .hand-sliders td, .hand-steps th, .hand-steps td { vertical-align: top; }
+.hand-sliders th[scope="row"] small { display: block; color: var(--color-text-muted); font-size: 11px; }
+.hand-sliders tr.hand-screen th { text-align: left; padding-top: 14px; font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: var(--color-text-muted); border-bottom: 1px solid var(--color-border); }
+.hand-sliders tr.changed th[scope="row"] { color: var(--color-text-strong); }
+.hand-sliders td.pick { font-weight: 700; color: var(--color-text-strong); }
+.hand-input { width: 96px; text-align: right; font: inherit; padding: 4px 6px; background: var(--color-bg); color: var(--color-text-strong); border: 1px solid var(--color-border); border-radius: 4px; }
+.hand-keys-head, .hand-keys { text-align: left !important; }
+.hand-keys { min-width: 220px; white-space: normal; color: var(--color-text-strong); }
+.hand-keys small { display: block; color: var(--color-text-muted); font-size: 11px; }
+.hand-clear { margin-left: 8px; }
+
+.hand-steps th, .hand-steps td { text-align: left; }
+.hand-sliders tr:not(.changed):not(.hand-screen) { opacity: .62; }
+.hand-sliders tr:not(.changed):not(.hand-screen) td.pick { font-weight: normal; }
+.hand-sliders thead th:first-child, .hand-steps thead th { text-align: left; }

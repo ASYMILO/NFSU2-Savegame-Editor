@@ -1,8 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
-import { DynoModel, findCar, parseGameData, type GameData } from '../model/dyno.js';
-import { installedForLevels } from '../model/virtual-save.js';
+import { DynoModel, findCar, parseGameData, readSlotDyno, type GameData } from '../model/dyno.js';
+import { buildVirtualSave, installedForLevels } from '../model/virtual-save.js';
 import { formatHandPlan, planHandInput, routeToByte } from '../model/hand-input.js';
 import { NitroScreen, openRow, pressFinalDrive, pressRowState, resetRow, rowInfo, rowShown, setRowShown } from '../model/tune-keys.js';
 
@@ -107,4 +107,40 @@ test('six-speed: a typed gear speed is reached with keys; a pushed neighbour is 
   assert.ok(Math.abs(plan.setup[12] - want[12]) <= 1);
   // the dyno reads the planned bytes: A is a real setup of this car
   assert.ok(plan.a.topKmh > 0);
+});
+
+test('no-save mode: the final drive starts where the owner says the screen stands (byte 128) and byte 101 is 9 presses away', { skip: SKIP }, () => {
+  const game = load();
+  const car = game.cars.find((c) => c.name === '3000GT')!;
+  // the no-save path: an in-memory save with neutral setups (every row at what key C gives)
+  const save = buildVirtualSave(car.hash, installedForLevels({ EC: 3, TU: 2, TR: 2 }));
+  const sd = readSlotDyno(save, 0), model = new DynoModel(game, findCar(game, sd.hash)!, sd.installed, sd.uniques);
+  const neutralSetup = sd.setups[1];
+  assert.equal(neutralSetup[9], 100, 'default start = the value after C');
+  // the owner types the number the final drive shows now (the one byte 128 stands for) and the number he wants (byte 101's)
+  const info = rowInfo(model, neutralSetup, 9)!;
+  const start = setRowShown(model, neutralSetup, 9, rowShown(info, 128))!;
+  assert.equal(start[9], 128);
+  const want = setRowShown(model, start, 9, rowShown(info, 101))!;
+  assert.equal(want[9], 101);
+  const plan = planHandInput(model, start, want, 1, undefined, [9], [9]); // 3 decimals typed: the byte, not just the number on the screen
+  const fd = plan.plans.find((p) => p.row?.param === 9)!;
+  assert.deepEqual([fd.start, fd.presses, fd.passes], ['saved', 9, [[-9]]]);
+  assert.equal(plan.setup[9], 101);
+  // the default start (nothing typed) is the value after C, byte 100. The number 3.97 is also what bytes 101..103 show, so
+  // one RIGHT reaches it; the exact byte 101 takes 45 keys from there (23 RIGHT to the top end, 22 LEFT down the shifted grid).
+  const fromC = planHandInput(model, neutralSetup, want, 1, undefined, [9]).plans.find((p) => p.row?.param === 9)!;
+  assert.deepEqual([fromC.presses, fromC.row!.reached, fromC.setup[9]], [1, '3.97', 103]);
+  assert.equal(routeToByte(model, neutralSetup, 9, 101, 0, 'never')!.presses, 45);
+});
+
+test('a number typed at the screen\'s precision counts when the screen shows it: fewer keys than the exact byte', { skip: SKIP }, () => {
+  const model = gt(load(), 2);
+  const info = rowInfo(model, neutral(), 9)!;
+  const start = neutral([9, 128]);
+  const want = setRowShown(model, start, 9, Number(rowShown(info, 101).toFixed(2)))!;
+  const loose = planHandInput(model, start, want, 1, undefined, [9]).plans.find((p) => p.row?.param === 9)!;
+  const exact = planHandInput(model, start, want, 1, undefined, [9], [9]).plans.find((p) => p.row?.param === 9)!;
+  assert.equal(loose.row!.reached, loose.row!.wanted);
+  assert.ok(loose.presses <= exact.presses);
 });
