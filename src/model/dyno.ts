@@ -390,7 +390,7 @@ const byteT32 = (b: number): number => clamp(Math.fround(Math.fround(b - 100) * 
  * Gear and final-drive byte encoder of FUN_005b3ee0 -> FUN_0059af80, in float32:
  * trunc(((ratio - def) / (max - min)) * 100f + 100.5f), with the ratio clamped to its range first.
  */
-const encodeGearByte = (ratio: number, def: number, min: number, max: number): number => {
+export const encodeGearByte = (ratio: number, def: number, min: number, max: number): number => {
   const f = Math.fround;
   const frac = f(f(f(clamp(ratio, min, max)) - f(def)) / f(f(max) - f(min)));
   return clamp(Math.floor(f(f(frac * 100) + 100.5)), 0, MAX_TUNE_BYTE);
@@ -954,6 +954,27 @@ export class DynoModel {
         maxByte: clamp(Math.floor(toByte(max) + 1e-6), 0, MAX_TUNE_BYTE),
       };
     });
+  }
+
+  /**
+   * Range, installed default and absolute range (the slider scale) of one ECU / turbo column in kN·m (the numbers the tuning screen
+   * uses for its keys, see tune-keys.ts). Call {@link tuned} first: the defaults are captured there.
+   * @returns null when the curve is locked.
+   */
+  curveColumn(p: Phys, kind: CurveKind, i: number): { min: number; max: number; def: number; absMin: number; absMax: number } | null {
+    const param = kind === 'ecu' ? P_ECU : P_TURBO;
+    if (!this.active(p, param)) return null;
+    const [min, max] = this.range(p, param, i), [absMin, absMax] = this.absRange(p, param);
+    return { min, max, def: (this.curveDefs.get(param) as number[])[i], absMin, absMax };
+  }
+
+  /**
+   * Torque the unique parts add to column i of the ECU / turbo tables (kN·m, FUN_005997e0): engine, ECU and turbo
+   * uniques, 0 when not installed. The tuning setter takes them out before it works on a curve and puts them back.
+   */
+  uniqueTorque(i: number): [engine: number, ecu: number, turbo: number] {
+    const c = this.car, u = this.uniques;
+    return [u[3] ? R(c, 0x2d0 + 4 * i) : 0, u[7] ? R(c, 0x2f4 + 4 * i) : 0, u[4] ? R(c, 0x318 + 4 * i) : 0];
   }
 
   /**
