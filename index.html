@@ -22,7 +22,149 @@
     </div>
   </header>
 
-  <main class="editor-main">
+  <nav class="tuner-nav" aria-label="Screens">
+    <button type="button" ng-class="{ active: view === 'tuner' }" ng-attr-aria-current="{{ view === 'tuner' ? 'page' : undefined }}" ng-click="view = 'tuner'">Tuner</button>
+    <button type="button" ng-class="{ active: view === 'editor' }" ng-attr-aria-current="{{ view === 'editor' ? 'page' : undefined }}" ng-click="view = 'editor'">Save editor</button>
+  </nav>
+
+  <main class="editor-main tuner-main" ng-show="view === 'tuner'">
+    <section class="profile-section">
+      <h3>1. Your car</h3>
+      <div class="editor-row" ng-if="!tuning.dyno.gameName">
+        <label class="profile-action-btn dyno-file">
+          Load game data
+          <input type="file" accept=".bun,.BUN" nfsu-file-change="loadGameData">
+        </label>
+        <span class="muted">Pick <code>GLOBAL\GLOBALB.BUN</code> from your NFSU2 folder. It stays in this browser.</span>
+      </div>
+      <p class="message error" ng-if="tuning.dyno.gameError">{{ tuning.dyno.gameError }}</p>
+      <div class="hand-mode tuner-source" role="radiogroup" aria-label="Where the car comes from">
+        <label ng-class="{ on: tuner.source === 'save' }">
+          <input type="radio" name="tunersource" value="save" ng-model="tuner.source" ng-change="tunerChanged()">
+          <span class="hand-mode-name">From my save</span>
+          <span class="hand-mode-note">Your car, its parts and its current tuning.</span>
+        </label>
+        <label ng-class="{ on: tuner.source === 'list' }">
+          <input type="radio" name="tunersource" value="list" ng-model="tuner.source" ng-change="tunerChanged()">
+          <span class="hand-mode-name">Pick a car</span>
+          <span class="hand-mode-note">No save needed. Choose the car and its parts.</span>
+        </label>
+      </div>
+      <div ng-if="tuner.source === 'save'">
+        <div class="editor-row">
+          <label class="profile-action-btn dyno-file">
+            {{ loaded && !virtual.on ? 'Load another save' : 'Load save' }}
+            <input type="file" accept="*/*" aria-label="Choose career save or nfsu2-web backup ZIP" nfsu-file-change="loadFile">
+          </label>
+          <span class="muted" ng-if="fileName">{{ fileName }}</span>
+          <span class="muted" ng-if="!fileName">A career save or an nfsu2-web backup ZIP.</span>
+        </div>
+        <div class="dyno-controls">
+          <label ng-if="backup">Profile
+            <select ng-model="backup.current" ng-change="selectProfile(backup.current)"
+                    ng-options="profile.index as profile.label for profile in backup.profiles"></select>
+          </label>
+          <label ng-if="tuner.slots.length">Car
+            <select ng-model="tuner.slot" ng-options="s.index as s.name for s in tuner.slots" ng-change="tunerChanged()"></select>
+          </label>
+        </div>
+        <p class="message" ng-class="status.type" ng-if="status.text" role="status">{{ status.text }}</p>
+      </div>
+      <div class="dyno-controls tuner-list" ng-if="tuner.source === 'list'">
+        <label>Car
+          <select ng-model="tuner.carHash" ng-options="c.hash as c.name for c in tuner.cars" ng-change="tunerChanged()" ng-disabled="!tuner.cars.length"></select>
+        </label>
+        <label ng-repeat="level in tuner.levels track by level.code">{{ level.label }}
+          <select ng-model="level.value" ng-options="o.value as o.label for o in level.options" ng-change="tunerChanged()"></select>
+        </label>
+      </div>
+    </section>
+
+    <section class="profile-section">
+      <h3>2. Optimize</h3>
+      <div class="editor-row">
+        <button type="button" class="profile-action-btn tuner-go" ng-click="tunerOptimize()" ng-disabled="tuner.busy || !tuning.dyno.gameName">{{ tuner.busy ? 'Working…' : 'Optimize' }}</button>
+        <span class="muted" ng-if="!tuner.busy">Finds the best setup for every race type at once.</span>
+        <span class="muted" ng-if="tuner.busy" role="status">{{ tuner.progress }}</span>
+      </div>
+      <p class="message error" ng-if="tuner.error">{{ tuner.error }}</p>
+      <details class="hand-older">
+        <summary>Preferences</summary>
+        <div class="tuner-prefs" role="radiogroup" aria-label="What matters most">
+          <label ng-repeat="p in tuner.prefs track by p.key">
+            <input type="radio" name="tunerpref" ng-value="p.key" ng-model="tuner.pref" ng-change="tunerChanged()">
+            <strong>{{ p.label }}</strong> <span class="muted">{{ p.text }}</span>
+          </label>
+        </div>
+      </details>
+    </section>
+
+    <section class="profile-section" ng-if="tuner.cards.length">
+      <h3>3. Set it in the game: {{ tuner.carName }}</h3>
+      <p class="message error" ng-if="tuner.stale">You changed the car, parts or preferences. Press Optimize again.</p>
+      <p class="muted">The game has one tuning tab per race type. Pick the tab on the Performance Tuning screen, then do the steps from top to bottom.
+        <span ng-if="tuner.fromC">No save: press C first where it says C. Then the game starts from the same values as here.</span>
+        <span ng-if="!tuner.fromC">The steps start from the values in your save.</span></p>
+      <article class="hand-card tuner-card" ng-repeat="card in tuner.cards track by card.title">
+        <h3>{{ card.title }}</h3>
+        <p class="tuner-uses" ng-repeat="u in card.uses track by $index">{{ u }}</p>
+        <p class="tuner-same" ng-if="card.setups.length > 1">Same plan for these tabs: set each of them the same way.</p>
+        <div class="hand-tiles">
+          <div class="hand-tile" ng-repeat="tile in card.tiles track by tile.label">
+            <span class="hand-tile-label">{{ tile.label }}</span>
+            <span class="hand-tile-main pick">{{ tile.value }}</span>
+          </div>
+        </div>
+        <p class="muted">{{ card.bLine }}</p>
+        <p class="muted" ng-if="card.note">{{ card.note }}</p>
+        <p ng-if="!card.steps.length">Nothing to change. Your tuning is already the best found.</p>
+        <div class="tuner-step" ng-repeat="step in card.steps track by $index">
+          <p><strong>{{ step.screen }}</strong> · {{ step.row }}: <span class="hand-keys">{{ step.keys }}</span>
+            <span ng-if="step.shows">→ shows <strong>{{ step.shows }}</strong></span></p>
+          <svg class="dyno-graph" role="img" ng-if="step.chart" ng-attr-view_box="0 0 {{ step.chart.width }} {{ step.chart.height }}"
+               aria-label="{{ step.screen }} graph with the presses under each bar">
+            <g class="dyno-grid">
+              <line ng-repeat="tick in step.chart.ticks track by $index"
+                    ng-attr-x1="{{ step.chart.left }}" ng-attr-x2="{{ step.chart.width - 8 }}" ng-attr-y1="{{ tick.y }}" ng-attr-y2="{{ tick.y }}"></line>
+              <text ng-repeat="tick in step.chart.ticks track by $index" class="dyno-axis"
+                    ng-attr-x="{{ step.chart.left - 6 }}" ng-attr-y="{{ tick.y + 4 }}" text-anchor="end">{{ tick.label }}</text>
+            </g>
+            <g ng-repeat="col in step.chart.columns track by col.index" class="dyno-col">
+              <rect class="dyno-range" ng-attr-x="{{ col.x + 3 }}" ng-attr-y="{{ col.rangeY }}" ng-attr-width="{{ col.width - 6 }}" ng-attr-height="{{ col.rangeH }}"></rect>
+              <rect class="dyno-value-bar" ng-attr-x="{{ col.x + 3 }}" ng-attr-y="{{ col.valueY }}" ng-attr-width="{{ col.width - 6 }}" ng-attr-height="{{ col.valueH }}"></rect>
+              <line class="dyno-stock" ng-attr-x1="{{ col.x + 3 }}" ng-attr-x2="{{ col.x + col.width - 3 }}" ng-attr-y1="{{ col.stockY }}" ng-attr-y2="{{ col.stockY }}"></line>
+              <circle class="dyno-dot" ng-attr-cx="{{ col.x + col.width / 2 }}" ng-attr-cy="{{ col.valueY }}" r="5"></circle>
+              <text class="dyno-axis" ng-attr-x="{{ col.x + col.width / 2 }}" ng-attr-y="{{ step.chart.bottom + 16 }}" text-anchor="middle">{{ col.rpmLabel }}</text>
+              <text class="dyno-press" ng-repeat="press in col.presses track by $index" ng-attr-x="{{ col.x + col.width / 2 }}"
+                    ng-attr-y="{{ step.chart.bottom + 32 + $index * 14 }}" text-anchor="middle">{{ press }}</text>
+            </g>
+            <text class="dyno-axis" ng-repeat="label in step.chart.passLabels track by $index" x="2" ng-attr-y="{{ step.chart.bottom + 32 + $index * 14 }}">{{ label }}</text>
+            <text class="dyno-axis" ng-attr-x="{{ step.chart.width - 8 }}" ng-attr-y="{{ step.chart.height - 4 }}" text-anchor="end">RPM</text>
+          </svg>
+          <p class="muted" ng-if="step.chart">▲3 = UP 3 times on that bar, ▼2 = DOWN 2 times. Do the first row of numbers on all bars, left to right, then the next row.</p>
+        </div>
+        <div class="editor-row" ng-if="tuner.canWrite">
+          <button type="button" class="profile-action-btn" ng-click="tunerWrite(card)" ng-disabled="tuner.stale || card.written">{{ card.written ? 'Written to save' : 'Write exact setup to save' }}</button>
+          <span class="muted">Writes the exact numbers, not the key result.</span>
+        </div>
+        <details class="hand-older">
+          <summary>Details</summary>
+          <table class="dyno-table">
+            <thead><tr><th></th><th>By hand</th><th>Write to save</th><th>Difference</th></tr></thead>
+            <tbody><tr ng-repeat="row in card.table track by row.label"><th scope="row">{{ row.label }}</th><td>{{ row.a }}</td><td>{{ row.b }}</td><td>{{ row.diff }}</td></tr></tbody>
+          </table>
+          <p class="muted">{{ card.presses }} key presses in all. Dyno numbers as the game's dyno screen shows them.</p>
+          <pre class="dyno-sheet">{{ card.sheet }}</pre>
+        </details>
+      </article>
+      <div class="editor-row" ng-if="tuner.written">
+        <button type="button" class="profile-action-btn" ng-click="download()">{{ backup ? 'Download edited ZIP' : 'Download edited save' }}</button>
+        <span class="muted">Keep your original backup.</span>
+      </div>
+    </section>
+  </main>
+
+  <main class="editor-main" ng-show="view === 'editor'">
     <section class="profile-section">
       <h3>Save file</h3>
       <p class="muted">Start with a backup. Load a career save or an nfsu2-web backup ZIP. Your file stays in this browser.</p>

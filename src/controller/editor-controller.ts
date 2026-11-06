@@ -27,6 +27,7 @@ import { formatSheet, OBJECTIVES, OBJ_BY_SETUP, runLegal } from '../model/legal-
 import { formatHandPlan, handSteps, planHandInput, ROW_LABELS, ROW_ORDER, shownText, type HandInputPlan } from '../model/hand-input.js';
 import { NitroScreen, rowInfo, rowScale, setRowShown } from '../model/tune-keys.js';
 import { buildVirtualSave, installedForLevels, PART_LEVEL_CATEGORIES } from '../model/virtual-save.js';
+import { attachTuner } from './tuner-controller.js';
 
 const partsByIndex = new Map<number, PerfPart>(PERF_PARTS.map((p) => [p.index, p]));
 const tuningPerfIndexSet = new Set(TUNING_PERF_INDICES);
@@ -57,12 +58,15 @@ export function EditorController($scope: EditorScope): void {
   let donors: Donor[] = [];
   let donorIndex = new Map<number, Donor>();
   let game: GameData | null = null;
+  let gameBytes: Uint8Array | null = null;
   let visuals: VisualCatalog | null = null;
   let visualDraft: Uint8Array | null = null;
   /** Unapplied dyno setups by `slot:setup`; Auto-tune and graph edits both change them. */
   const drafts = new Map<string, { bytes: Uint8Array; band: TuningBand }>();
   let backup: { zip: ZipArchive; profiles: BackupProfile[]; work: Map<number, Uint8Array>; current: number } | null = null;
   let loadToken = 0;
+  /** Tells the Tuner screen that the save or the game data changed (set at the end of this function). */
+  let tunerSync = (): void => {};
 
   $scope.loaded = false;
   $scope.fileName = '';
@@ -141,6 +145,7 @@ export function EditorController($scope: EditorScope): void {
   }
 
   function refresh(): void {
+    tunerSync();
     if (!data) return;
     const bytes = data;
     $scope.slots = Array.from({ length: slotCount(bytes) }, (_, index): SlotView => {
@@ -449,6 +454,7 @@ export function EditorController($scope: EditorScope): void {
     $scope.slots = [];
     resetEditor();
     setStatus('error', text);
+    tunerSync();
   }
 
   /** Replaces the working bytes and re-renders. Other save edits discard unapplied dyno drafts. */
@@ -695,11 +701,13 @@ export function EditorController($scope: EditorScope): void {
       const nextGame = parseGameData(bytes);
       const nextVisuals = parseVisualData(bytes, nextGame.cars);
       game = nextGame;
+      gameBytes = bytes;
       visuals = nextVisuals;
       $scope.tuning.dyno.gameName = name;
       $scope.tuning.dyno.gameError = '';
     } catch (err) {
       game = null;
+      gameBytes = null;
       visuals = null;
       $scope.tuning.dyno.gameName = '';
       $scope.tuning.dyno.gameError = errorMessage(err);
@@ -711,6 +719,7 @@ export function EditorController($scope: EditorScope): void {
     if ($scope.virtual.on) rebuildVirtualSave();
     rebuildDyno();
     rebuildVisual();
+    tunerSync();
   }
 
   $scope.loadGameData = function (file: File | null): void {
@@ -1218,6 +1227,14 @@ export function EditorController($scope: EditorScope): void {
     setTimeout(() => URL.revokeObjectURL(url), 0);
     setStatus('success', message);
   };
+
+  // The Tuner screen (src/controller/tuner-controller.ts) reads the save and the game data and writes only through here.
+  tunerSync = attachTuner($scope, {
+    save: () => ($scope.loaded && !$scope.virtual.on ? data : null),
+    game: () => game,
+    gameBytes: () => gameBytes,
+    apply: (next, message) => { applyResult(next); setStatus('success', message); },
+  });
 }
 
 /**

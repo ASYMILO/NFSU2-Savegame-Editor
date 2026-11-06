@@ -478,3 +478,22 @@ body {
 .hand-sliders tr:not(.changed):not(.hand-screen) { opacity: .62; }
 .hand-sliders tr:not(.changed):not(.hand-screen) td.pick { font-weight: normal; }
 .hand-sliders thead th:first-child, .hand-steps thead th { text-align: left; }
+
+/* Tuner screen (src/controller/tuner-controller.ts) */
+.tuner-nav { width: min(100%, 1168px); margin: 0 auto; padding: 16px 24px 0; display: flex; gap: 6px; }
+.tuner-nav button { padding: 8px 18px; border: 1px solid var(--color-border); border-radius: 8px; background: var(--color-surface); color: var(--color-text-muted); font: inherit; cursor: pointer; }
+.tuner-nav button.active { border-color: var(--color-primary); background: var(--color-elevated); color: var(--color-text-strong); box-shadow: inset 0 -2px 0 var(--color-primary); }
+.tuner-main .dyno-controls label { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; font-size: 13px; color: var(--color-text-muted); }
+.tuner-list { align-items: flex-end; }
+.tuner-go { font-size: 16px; padding: 10px 28px; }
+.tuner-prefs { display: grid; gap: 8px; margin-top: 8px; }
+.tuner-prefs label { display: block; font-size: 13px; color: var(--color-text); cursor: pointer; }
+.tuner-prefs input { accent-color: var(--color-primary); margin-right: 6px; }
+.tuner-card { display: grid; gap: 8px; }
+.tuner-card h3 { font-size: 16px; margin: 0; }
+.tuner-uses { margin: 0; color: var(--color-text); }
+.tuner-same { margin: 0; color: var(--color-primary); }
+.tuner-step { padding: 8px 0; border-top: 1px solid var(--color-border); }
+.tuner-step p { margin: 0 0 6px; }
+.tuner-step .hand-keys { min-width: 0; }
+.tuner-card .dyno-graph { max-width: 560px; }

@@ -221,6 +221,45 @@ export interface VirtualView {
   levels: { code: string; label: string; value: number; options: { value: number; label: string }[] }[];
 }
 
+/** One card of the Tuner screen: one game tab, or several with the same plan. */
+export interface TunerCardView {
+  setups: number[];
+  title: string;
+  uses: string[];
+  /** Mode A on the dyno screen: 0-60, 0-100, top speed, power. */
+  tiles: { label: string; value: string }[];
+  /** Mode B in one line, with A minus B. */
+  bLine: string;
+  presses: number;
+  steps: { screen: string; row: string; keys: string; shows: string; presses: number; chart?: CurveChart }[];
+  note: string;
+  table: HandRow[];
+  sheet: string;
+  written: boolean;
+}
+
+/** The Tuner screen: car from the save or from lists, one Optimize, a card per game tab. */
+export interface TunerView {
+  source: 'save' | 'list';
+  slots: { index: number; name: string }[];
+  slot: number | null;
+  cars: { hash: number; name: string }[];
+  carHash: number;
+  levels: VirtualView['levels'];
+  pref: string;
+  prefs: { key: string; label: string; text: string }[];
+  busy: boolean;
+  progress: string;
+  error: string;
+  /** The inputs changed after the last Optimize. */
+  stale: boolean;
+  carName: string;
+  fromC: boolean;
+  canWrite: boolean;
+  written: boolean;
+  cards: TunerCardView[];
+}
+
 /** Top-level tuning tab. */
 export interface TuningTab {
   code: string;
@@ -332,4 +371,10 @@ export interface EditorScope extends angular.IScope {
   curvePointer(event: MouseEvent, start: boolean): void;
   curveKey(event: KeyboardEvent): void;
   download(): void;
+  /** First screen: `tuner` (our Tuner) or `editor` (the author's save editor). */
+  view: 'tuner' | 'editor';
+  tuner: TunerView;
+  tunerChanged(): void;
+  tunerOptimize(): void;
+  tunerWrite(card: TunerCardView): void;
 }
