@@ -1191,7 +1191,14 @@ export function EditorController($scope: EditorScope): void {
   };
 
   $scope.download = function (): void {
-    if (!data) return;
+    if (data) downloadSave(data);
+  };
+
+  /**
+   * Downloads the save (or the backup ZIP) with `current` as the open profile's bytes.
+   * @param current The open profile; the Tuner passes a changed copy and the editor's own state stays as it is.
+   */
+  function downloadSave(current: Uint8Array): void {
     let out: Uint8Array;
     let name = $scope.fileName || 'career';
     let message = 'Downloaded with recalculated checksums.';
@@ -1203,7 +1210,8 @@ export function EditorController($scope: EditorScope): void {
         if (entry.data.length === bytes.length && entry.data.every((byte, i) => byte === bytes[i])) return;
         entries[index] = { ...entry, data: bytes, ...stamp };
       };
-      for (const [index, working] of backup.work) {
+      for (const [index, saved] of backup.work) {
+        const working = index === backup.current ? current : saved;
         const profile = backup.profiles[index];
         const career = recalculateChecksums(careerBytes(working));
         replace(profile.careerEntry, career);
@@ -1215,7 +1223,7 @@ export function EditorController($scope: EditorScope): void {
       if (!/\.zip$/i.test(name)) name += '.zip';
       message = 'Downloaded nfsu2-web backup ZIP with recalculated save checksums and GARAGE.DAT fingerprints.';
     } else {
-      out = recalculateChecksums(data);
+      out = recalculateChecksums(current);
     }
     const url = URL.createObjectURL(new Blob([out as Uint8Array<ArrayBuffer>], { type: backup ? 'application/zip' : 'application/octet-stream' }));
     const link = document.createElement('a');
@@ -1225,15 +1233,15 @@ export function EditorController($scope: EditorScope): void {
     link.click();
     link.remove();
     setTimeout(() => URL.revokeObjectURL(url), 0);
-    setStatus('success', message);
-  };
+    setStatus('success', current === data ? message : `${message} The loaded save is not changed.`);
+  }
 
-  // The Tuner screen (src/controller/tuner-controller.ts) reads the save and the game data and writes only through here.
+  // The Tuner screen (src/controller/tuner-controller.ts) only reads the save; its download is a changed copy.
   tunerSync = attachTuner($scope, {
     save: () => ($scope.loaded && !$scope.virtual.on ? data : null),
     game: () => game,
     gameBytes: () => gameBytes,
-    apply: (next, message) => { applyResult(next); setStatus('success', message); },
+    download: (next) => downloadSave(next),
   });
 }
 

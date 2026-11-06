@@ -194,7 +194,74 @@ Tests: `npm test` **131, 110 pass, 0 fail, 21 skipped**; `src/test/save.test.ts`
 Not checked (3c-2): a stock front bumper with a body-shop spoiler (code says: only rear downforce); the Tuner's no-save mode
 typed in the game; LEFT to a nearer bar (not used); imperial units; phone widths and other browsers.
 
+## 3d. Steps one by one, "Your car now", preferences after Optimize, read-only save (2026-11-06)
+
+Owner's points and what changed (all in `index.html` Tuner `<main>`, `src/controller/tuner-controller.ts`):
+
+| Point | Now |
+|---|---|
+| Game file first, nothing else before it | Step 1 "Game data". Without it only the file button shows (`r3d-0`). With the local copy one line: "Game data: loaded" (`r3d-1`). Steps 2-5 have `ng-if="tuning.dyno.gameName"`. |
+| Why 3000GT after the file? | It was hard-coded (`tuner-controller.ts:62` on 3c, `c.name === '3000GT'`). Gone: list mode starts at "Pick a car…"; a save with one car takes it, with more the user picks (`r3d-2a`: ASYMILO has PEUGOT106 + 3000GT). |
+| Current info before Optimize | Step 3 "Your car now": parts per category, dyno per tab (save) or "Factory setting" (no save), folded "Slider values now" per tab (`r3d-2`, `r3d-6`). |
+| Preferences = sliders, after Optimize | Folded "Preferences: tweak after you tried it" below the cards: engine goal (4 choices, re-runs Optimize) and up to 5 driving sliders for the tab on show (`r3d-4`). A slider re-plans the card's steps at once (`r3d-4a`). |
+| Where "modify save" goes | No question at load: the save is only read. At the end, only with a save: "Download changed save" = a copy with the exact setup (mode B) of all 5 tabs, sliders included (`r3d-5`). Without a save one line: writing a save needs a save (`r3d-8`). The per-card "Write to save" is gone. |
+| Each screen: what to buy, does Optimize tune it | Every screen line says it: locked "Buy X to open it. Then Optimize tunes it." / "Optimize does not tune it."; open "Optimize tunes it. Already right" or "Optimize does not tune it. Use its slider under Preferences, or set it yourself." Part list hints say which screen a part opens and whether Optimize tunes it. |
+| Locked ECU / Turbo / Drivetrain: what-if | One line with the first part that opens it, both at the factory setting (two dyno runs, no Optimize): e.g. 3000GT with Turbo + Transmission Pro, no ECU: "With Fuel Pressure Regulator (Street), before any tuning: 0–60 5.55 s (now 5.61 s)" (`r3d-7`, `lockedWhatIf` in `src/model/tuner.ts`). A what-if with Optimize would cost 20-50 s per tab, so it is not done. |
+
+### Preference sliders (`src/model/feel.ts`)
+The game has no handling score and the dyno does not use these rows: with every slider at -100 and +100 the Circuit dyno of the
+3000GT (all Extreme) stays 3.53 / 9.03 / 347.6 km/h / 506.4 bhp (script below). So the sliders are the player's choice: middle =
+as now, each end = the end of the row's box. The UI says "the dyno does not measure it, so there is no best value".
+Which rows and which way is checked by `src/test/feel.test.ts` (right = row value up, nitrous right = duration down).
+The driving words are textbook car handling, **not checked in the game**.
+
+| Label (left / right) | Rows it moves | What the game's code does with them |
+|---|---|---|
+| Ride (Soft, soaks bumps / Firm, quick to react) | Front + Rear Springs, Front + Rear Shocks (bytes 0, 4, 1, 5) | `FUN_005a3700`: force = spring·0.9·compression + 0.9·shock·speed (tuner repo `docs/setup-bytes.md` l.115-117) |
+| Grip at high speed (Less / More) | Front + Rear Downforce (21, 22) | `FUN_0059e620`: downforce grows with speed (l.125-126); Street/Pro body parts can only lower it (l.53) |
+| Braking (Stable, straight / Turns in more) | Brake Bias (18), right = more rear | `FUN_005a4d80`: front = 2·pedal·(1−B), rear = 2·pedal·B (l.120-121) |
+| Rear end (Slides more (drift) / Grips) | Rear Grip (20) | `FUN_005a8280`: friction = grip × load (l.122-125); can only go down (l.53) |
+| Nitrous boost (Long, gentle / Short, strong) | Nitrous (16, 17 coupled) | `FUN_005b3100`: one slider, longer = weaker (l.58); `FUN_00594300` adds torque × intensity (l.127). Hidden on Drift and Street X (the race turns nitrous off, l.103) |
+
+Left out on purpose: sway bars (their force code was not found, l.118), Steering Ratio (use unknown, section C), lowering
+(moves the wheels only millimetres, CG unchanged). The keys for these rows use the same key code as final drive and gears
+(`tune-keys.ts` `pressRowState`; step size measured in game, tuner repo `docs/native-menu-map.md` l.175-179).
+
+### Part level L1 vs L3 (same part, wider range)
+Model run (`dist/` of this branch, 3000GT, Circuit tab, from the factory setting; ECU, Turbo and Transmission at the level, the
+rest Extreme; mode A = by hand):
+
+| Level | Factory 0-60 / 0-100 / top / power | After Optimize (A) | Gain 0-60 |
+|---|---|---|---|
+| 1 Street | 5.02 s / 11.88 s / 309.0 / 395.9 bhp | 4.76 s / 11.44 s / 313.8 / 412.0 bhp | −0.26 s |
+| 2 Pro | 4.78 s / 11.42 s / 318.6 / 419.7 bhp | 4.42 s / 10.75 s / 323.5 / 445.8 bhp | −0.36 s |
+| 3 Extreme | 4.34 s / 10.58 s / 333.1 / 472.0 bhp | 3.55 s / 9.03 s / 347.6 / 507.6 bhp | −0.79 s |
+
+A higher level gives more power by itself and a wider box for the bars (range expansion, `docs/setup-bytes.md` l.46-55), so
+Optimize gains more; Extreme also opens the 6 gears. A locked screen is skipped: Optimize only searches rows that have a
+tuning record (`legal-opt.ts` `partsInfo` l.62-74).
+
+### Checks
+- `npm test`: **134, 113 pass, 0 fail, 21 skipped**; `src/test/save.test.ts` unchanged. New: `src/test/feel.test.ts` (3).
+- Headless Brave on http://127.0.0.1:8771/ (server `tools/serve_editor.py` from nfsu2-tuner `feat/tuner-r3c`;
+  `/game/GLOBALB.BUN` = 200, same bytes as `data/game/`), copy of the owner's ASYMILO profile: no page errors.
+  Save results = 3c in the game (Circuit 4.22 / 10.35 / 323.5 ...). Downloaded copy: 98 bytes differ, all in slot 2's five
+  setups (0x63b6-0x6482) and the checksums (0x14-0x1b); checksums valid. The Save editor's own download afterwards = the loaded
+  file byte for byte (the Tuner did not change it). The original save on disk is unchanged (sha1 6bedc6ad…).
+- Screens: `docs/img/r3d-0` … `r3d-8` (logo hidden in the shots).
+
+### Design critique (from the shots), fixed
+- Step 1 button sat on the text (`r3d-0` first run): now on its own row.
+- "Slider values now" had right-aligned names: screen and row are left-aligned now.
+- Engine goal and handling ran together: space above "How the car feels".
+- Still open: the parts line in "Your car now" is long on one line; the card is long for a car with all parts (7 screens).
+
+### Not checked (3d)
+- None of the sliders' feel in the game (only that the bytes move the way the code says and the keys reach them in the model).
+- The new Download on an nfsu2-web backup ZIP (only a raw profile was tried).
+- Phone widths, other browsers.
+
 ## 7. Undo
 
-Round 3c only: `git checkout feat/tuner-r3 && npm run build` in `port-editor`. All of round 3: `git checkout feat/hand-input && npm run build` in `port-editor` (the author's screen and round 2 come back as before), or delete the
+Round 3d only: `git checkout 4582180 && npm run build`. Round 3c only: `git checkout feat/tuner-r3 && npm run build` in `port-editor`. All of round 3: `git checkout feat/hand-input && npm run build` in `port-editor` (the author's screen and round 2 come back as before), or delete the
 branch: `git branch -D feat/tuner-r3` and `git push fork --delete feat/tuner-r3`.

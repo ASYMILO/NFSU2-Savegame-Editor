@@ -56,6 +56,18 @@ export function withAero(installed: boolean[], levels: Record<string, number>): 
   return on;
 }
 
+/** The level per category (and aero part) of a car's installed flags: the highest installed level, 0 = none. */
+export function levelsOf(installed: boolean[]): Record<string, number> {
+  const out: Record<string, number> = {};
+  for (const cat of TUNING_PERF_CATEGORIES) {
+    out[cat.code] = Math.max(0, ...cat.indices.filter((i) => installed[i] && PERF_PARTS[i].active).map((i) => PERF_PARTS[i].level ?? 0));
+  }
+  for (const a of AERO_PARTS) {
+    out[a.code] = [1, 2, 3].filter((l) => installed[PERF_PARTS.findIndex((p) => p.key === `${a.key}${l}`)]).pop() ?? 0;
+  }
+  return out;
+}
+
 /** A 54,966-byte career save, valid for the editor's checks, with one bought car in slot 1 and neutral dyno setups. */
 export function buildVirtualSave(carHash: number, installed: boolean[]): Uint8Array {
   const data = new Uint8Array(PROFILE_SIZE);

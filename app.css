@@ -516,4 +516,16 @@ body {
 .tuner-screen.locked .tuner-badge { border-color: var(--color-warning); color: var(--color-warning); }
 .tuner-screen.keep, .tuner-screen.ok, .tuner-screen.locked { font-size: 13px; }
 .tuner-screen .tuner-step { border-top: 0; padding: 2px 0 6px 12px; }
-.tuner-howto { margin: 4px 0 0; padding-left: 20px; font-size: 13px; color: var(--color-text); }
+.tuner-howto { margin: 4px 0 0; padding-left: 20px; font-size: 13px; color: var(--color-text); }.tuner-done { margin: 0; color: var(--color-text); }
+.tuner-done::before { content: "✓ "; color: var(--color-primary); font-weight: 700; }
+.tuner-prefs-box { margin-top: 14px; }
+.tuner-prefs-box > p { font-size: 13px; color: var(--color-text); }
+.tuner-feel { display: grid; gap: 2px; padding: 8px 0; border-top: 1px solid var(--color-border); font-size: 13px; color: var(--color-text); }
+.tuner-feel-row { display: flex; align-items: center; gap: 10px; margin-top: 4px; }
+.tuner-feel-row span { flex: 0 0 140px; color: var(--color-text-muted); }
+.tuner-feel-row span:last-child { text-align: left; }
+.tuner-feel-row span:first-child { text-align: right; }
+.tuner-feel-row input { flex: 1 1 auto; max-width: 320px; accent-color: var(--color-primary); }
+.tuner-final { margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--color-border); }
+.tuner-now-settings th:nth-child(-n+2), .tuner-now-settings td:nth-child(-n+2) { text-align: left; }
+.tuner-feel-head { margin-top: 16px; }

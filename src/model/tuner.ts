@@ -3,9 +3,9 @@
  * mode B) and the key planner (hand-input.ts, mode A); neither is changed here. The page runs {@link optimizeTab} in web
  * workers (src/tuner-worker.ts) because one tab takes about 20 s.
  */
-import { SETUP_COUNT, SETUP_NAMES, SETUP_SIZE, type DynoModel, type GameData } from './dyno.js';
+import { DynoModel, SETUP_COUNT, SETUP_NAMES, SETUP_SIZE, type GameData } from './dyno.js';
 import { PERF_PARTS } from '../data/perf-parts.js';
-import { formatSheet, OBJ_BY_SETUP, runLegal } from './legal-opt.js';
+import { formatSheet, gameNumbers, OBJ_BY_SETUP, runLegal, type GameNumbers } from './legal-opt.js';
 import { formatHandPlan, planHandInput, ROW_ORDER, shownText, type HandInputPlan, type SliderPlan } from './hand-input.js';
 import { resetRow, rowInfo } from './tune-keys.js';
 
@@ -13,9 +13,9 @@ import { resetRow, rowInfo } from './tune-keys.js';
 export type Preference = 'race' | 'launch' | 'accel' | 'top';
 export const PREFERENCES: { key: Preference; label: string; text: string }[] = [
   { key: 'race', label: 'Best for each race', text: 'Each tab gets the goal of its own race type. This is the default.' },
-  { key: 'launch', label: 'Keep a strong start', text: 'Same goals, but the 3 lowest ECU bars keep at least 90 % of stock torque. This is our rule of thumb for the launch. The game does not confirm it.' },
-  { key: 'accel', label: 'Acceleration first', text: 'Every tab aims at short 0-60 and 0-100 times (the Street X goal).' },
-  { key: 'top', label: 'Top speed first', text: 'Every tab counts top speed most (the URL goal).' },
+  { key: 'launch', label: 'Strong pull from a stop', text: 'Same goals, but the engine keeps at least 90 % of its factory pull at low revs. Our rule of thumb, not checked in the game.' },
+  { key: 'accel', label: 'Quick acceleration', text: 'Every tab aims at short 0-60 and 0-100 times.' },
+  { key: 'top', label: 'High top speed', text: 'Every tab counts top speed most.' },
 ];
 
 /** Objective and launch rule of a tab for a preference (`launchMin` is the editor's old "Protect launch" value). */
@@ -67,18 +67,49 @@ const LEVEL_NAMES = ['', 'Street', 'Pro', 'Extreme'];
  */
 export function unlockParts(game: GameData, params: number[]): string[] {
   const out: string[] = [];
+  for (const { item, level } of unlockItems(game, params)) {
+    const p = PERF_PARTS[item];
+    // aero: the game takes the body part's level, not a shop item (docs/native-menu-map.md "Locked screens", tuner repo)
+    const text = p.category === 'AE' ? `a body-shop ${p.label.replace(/ L\d$/, '').toLowerCase()} (not stock)` : `${p.label} (${LEVEL_NAMES[level] ?? `level ${level}`})`;
+    if (!out.includes(text)) out.push(text);
+  }
+  return out;
+}
+
+/** The parts (PERF_PARTS index and level) that open these params, the lowest level per param. */
+export function unlockItems(game: GameData, params: number[]): { item: number; level: number }[] {
+  const out: { item: number; level: number }[] = [];
   for (const param of params) {
     const recs = game.tuning.filter((t) => t.param === param && PERF_PARTS[t.item]);
     if (!recs.length) continue;
     const low = Math.min(...recs.map((t) => t.level));
-    for (const t of recs.filter((x) => x.level === low)) {
-      const p = PERF_PARTS[t.item];
-      // aero: the game takes the body part's level, not a shop item (docs/native-menu-map.md "Locked screens", tuner repo)
-      const text = p.category === 'AE' ? `a body-shop ${p.label.replace(/ L\d$/, '').toLowerCase()} (not stock)` : `${p.label} (${LEVEL_NAMES[t.level] ?? `level ${t.level}`})`;
-      if (!out.includes(text)) out.push(text);
-    }
+    for (const t of recs.filter((x) => x.level === low)) if (!out.some((o) => o.item === t.item)) out.push({ item: t.item, level: t.level });
   }
   return out;
+}
+
+/**
+ * What-if for a locked engine screen (ECU, Turbo, Drivetrain): the dyno with the first part that opens it added, both cars at
+ * the factory setting (after Reset), so the part's own effect shows, not a tune. Cheap: two dyno runs, no Optimize.
+ * @returns null when no part opens the screen or the car with it cannot be built.
+ */
+export function lockedWhatIf(model: DynoModel, installed: boolean[], uniques: number[], screen: string):
+  { part: string; now: GameNumbers; withPart: GameNumbers } | null {
+  const params = SCREENS.find((s) => s.name === screen)?.params ?? [];
+  const pick = unlockItems(model.game, params).find((x) => x.item < installed.length);
+  if (!pick) return null;
+  const on = installed.slice();
+  for (const other of PERF_PARTS[pick.item].conflicts) if (other < on.length) on[other] = false;
+  on[pick.item] = true;
+  try {
+    const other = new DynoModel(model.game, model.car, on, uniques);
+    return {
+      part: `${PERF_PARTS[pick.item].label} (${LEVEL_NAMES[pick.level] ?? `level ${pick.level}`})`,
+      now: gameNumbers(model.evaluate(startAfterC(model))), withPart: gameNumbers(other.evaluate(startAfterC(other))),
+    };
+  } catch {
+    return null;
+  }
 }
 
 /** The screens that parts of one shop category open in the game (from the same tuning records). */
@@ -226,21 +257,29 @@ export interface ScreenPlan {
   steps: TunerStep[];
 }
 
-/** Optimize changes these screens only (legal-opt.ts: ECU and Turbo bars, final drive and gears). */
-const TUNED = new Set(['Drivetrain', 'ECU', 'Turbo']);
+/**
+ * Optimize changes these screens only: it searches ECU and Turbo bars, final drive and gears, and only the ones a part opens
+ * (legal-opt.ts partsInfo l.62-74; dyno.ts tuningRecords). The other screens are left as they are.
+ */
+export const TUNED = new Set(['Drivetrain', 'ECU', 'Turbo']);
 
-/** Every screen of the menu in the game's order, with the steps of `steps` under their screen (`setups`: the card's tabs). */
-export function screenPlans(model: DynoModel, setups: number[], steps: TunerStep[]): ScreenPlan[] {
+/**
+ * Every screen of the menu in the game's order, with the steps of `steps` under their screen (`setups`: the card's tabs).
+ * @param whatIf Extra line for a locked screen (the dyno with the part that opens it), by screen name.
+ */
+export function screenPlans(model: DynoModel, setups: number[], steps: TunerStep[], whatIf: Record<string, string> = {}): ScreenPlan[] {
   return SCREENS.map(({ name, params }) => {
     const own = steps.filter((s) => s.screen === name);
-    if (own.length) return { name, state: 'set', text: '', steps: own };
+    const tuned = TUNED.has(name);
+    if (own.length) return { name, state: 'set', text: tuned ? '' : 'Set by your sliders under Preferences.', steps: own };
     if (!params.some((p) => model.tuningRecords.has(p))) {
-      return { name, state: 'locked', text: `Locked in the game: its icon has a padlock and Enter does nothing. Any of these parts opens it: ${unlockParts(model.game, params).join(', ')}.`, steps: [] };
+      const then = tuned ? 'Then Optimize tunes it.' : 'Optimize does not tune it.';
+      return { name, state: 'locked', text: `Buy ${unlockParts(model.game, params).join(' or ')} to open it. ${then}${whatIf[name] ? ` ${whatIf[name]}` : ''}`, steps: [] };
     }
-    if (TUNED.has(name)) return { name, state: 'ok', text: 'Already right for this race.', steps: [] };
+    if (tuned) return { name, state: 'ok', text: 'Optimize tunes it. Already right for this race.', steps: [] };
     // drift and Street X presets zero nitrous duration (docs/setup-bytes.md l.103, FUN_005b4dc0)
-    const noNos = name === 'Nitrous' && setups.every((k) => k === 2 || k === 3) ? ' This race type turns nitrous off anyway.' : '';
-    return { name, state: 'keep', text: noNos.trim(), steps: [] };
+    if (name === 'Nitrous' && setups.every((k) => k === 2 || k === 3)) return { name, state: 'keep', text: 'This race turns nitrous off.', steps: [] };
+    return { name, state: 'keep', text: 'Optimize does not tune it. Use its slider under Preferences, or set it yourself.', steps: [] };
   });
 }
 

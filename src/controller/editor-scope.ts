@@ -241,34 +241,55 @@ export interface TunerCardView {
   note: string;
   table: HandRow[];
   sheet: string;
-  written: boolean;
 }
 
-/** The Tuner screen: car from the save or from lists, one Optimize, a card per game tab. */
+/** "Your car now" (before Optimize): the car, its parts, and the dyno and slider values of the tabs as they are. */
+export interface TunerNowView {
+  carName: string;
+  parts: { label: string; level: string }[];
+  missing: string[];
+  /** One row per tab (save), or one row "Factory setting" (no save). */
+  dyno: { tab: string; t60: string; t100: string; top: string; power: string }[];
+  /** Slider values per tab, as the game's screens show them. */
+  columns: string[];
+  settings: { screen: string; row: string; values: string[] }[];
+  /** Empty when the car can be tuned; otherwise why Optimize has nothing to do. */
+  problem: string;
+}
+
+/** One preference slider (the player's choice for a screen Optimize does not tune). */
+export interface TunerFeelView { key: string; screen: string; label: string; low: string; high: string; basis: string }
+
+/** The Tuner screen: steps revealed one by one, one Optimize, a card per game tab, preferences after the result. */
 export interface TunerView {
-  source: 'save' | 'list';
+  /** No default: the user picks. */
+  source: '' | 'save' | 'list';
   slots: { index: number; name: string }[];
   slot: number | null;
   cars: { hash: number; name: string }[];
   carHash: number;
   /** Part levels; `hint` says which screen of the game the part opens. */
   levels: (VirtualView['levels'][number] & { hint: string })[];
+  now: TunerNowView | null;
   pref: string;
   prefs: { key: string; label: string; text: string }[];
   busy: boolean;
   progress: string;
   error: string;
-  /** The inputs changed after the last Optimize. */
+  /** The save changed after the last Optimize. */
   stale: boolean;
   carName: string;
   fromC: boolean;
-  canWrite: boolean;
-  written: boolean;
+  /** A save was loaded for the result: mode B can be downloaded. */
+  canDownload: boolean;
   cards: TunerCardView[];
   /** The game's five tabs in its order and the card each one opens. */
   tabs: { name: string; short: string; card: number }[];
   /** The card on show (one game tab at a time). */
   card: number;
+  /** Slider positions of the card on show (-100..100, 0 = as now), and the sliders it can use. */
+  feel: Record<string, number>;
+  sliders: TunerFeelView[];
 }
 
 /** Top-level tuning tab. */
@@ -387,6 +408,9 @@ export interface EditorScope extends angular.IScope {
   tuner: TunerView;
   tunerChanged(): void;
   tunerOptimize(): void;
-  tunerWrite(card: TunerCardView): void;
+  tunerPref(): void;
+  tunerFeel(): void;
+  tunerTab(card: number): void;
+  tunerDownload(): void;
   tunerLogo(): string;
 }
