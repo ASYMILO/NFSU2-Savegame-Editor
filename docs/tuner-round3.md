@@ -105,8 +105,11 @@ Screens (`docs/img/`): ![save loaded](img/r3-1-save-loaded.png) ![pick a car](im
 - Menu order: the bytes are the same in the key code (test above), not tried in the game.
 - No save: "press C first on every row" assumes C works per row as measured for suspension and final drive (`native-menu-map.md` l.172-173); not tried for 6-speed gears.
 - The round 2 typed slider numbers (suspension, aero, tires, brakes, nitrous) are not on the Tuner screen. They stay in Save editor -> Tuning… -> DYNO.
-- Port 8771 (`serve_editors.sh` on `dev`, plain `http.server`) does not offer `./game/GLOBALB.BUN`: there the page asks for the file once.
-  `tools/serve_editor.py` (tuner branch `feat/hand-input-tools-r2`) loads it by itself.
+- Port 8771 offers `./game/GLOBALB.BUN` from `data/game/` when started with `serve_editors.sh` from nfsu2-tuner branch
+  `feat/hand-input-tools-r2` (it runs `tools/serve_editor.py`, 127.0.0.1 only, file read in place, never copied). Checked
+  2026-11-06: `curl -sf http://127.0.0.1:8771/game/GLOBALB.BUN` = 200, 8,008,064 bytes, same as `data/game/GLOBALB.BUN`;
+  the Tuner lists 67 cars under "Pick a car" with no file prompt (`docs/img/r3-10-8771.png`).
+  The `serve_editors.sh` on `dev` is still the old one (plain `http.server`, page asks for the file) until that branch is merged.
 - Merging of equal tabs: unit test only. Browsers other than Brave, phone widths: not tried.
 
 ## 7. Undo
