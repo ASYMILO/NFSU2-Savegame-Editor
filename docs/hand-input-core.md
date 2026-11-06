@@ -73,9 +73,8 @@ relay/check.sh                                   # build, tests, optimizer parit
 Inputs tested against the emulator (byte for byte):
 - Measured in the running game: ECU column 0 UP, UP, DOWN from `66 76 100 131 136 134 99 127 36` gives `76 79 96 128 133 131 95 124 39`;
   Turbo column 3 UP, UP, DOWN from `101 100 93 108 136 128 100 100 0` gives `107 107 86 118 134 125 96 96 2`.
-- 107 sequences (ECU and Turbo, 40 car / part sets of `dyno-exactness.json`, 3 to 25 keys, 4 % key C), 1,362 steps: all equal. Also checked once on
-  160 sequences (1,362 steps) before the fixture was cut to locked-curve-free cases.
-- Final drive: 30 sequences of 120 keys from the saved byte, from 100 and from 167, across both range ends. Start bytes outside the box are skipped.
+- 107 sequences (ECU and Turbo, 40 car / part sets of `dyno-exactness.json`, 3 to 25 keys, 4 % key C), 1,370 key steps: all equal.
+- Final drive: 30 sequences of 120 keys (3,600 steps) from the saved byte, from 100 and from 167, across both range ends. Sequences whose start byte lies outside the box are skipped.
 - Plans (`hand-input.test.ts`): the presses replayed on a fresh screen give the planned bytes for 40 part sets, bars get closer to the optimum.
 - ASYMILO 3000GT slot 1, Circuit (ECU 2 / Turbo 2 / transmission 2): A needs 29 key presses, 0-60 4.22 s, 0-100 10.35 s (B 10.33 s), top 323.5 km/h, power
   433.8 bhp (B 435.6). In the UI with ECU Extreme / Turbo Pro / Transmission Pro / Engine Pro (no save): 49 presses, A 4.30 / 10.54 / 333.1 km/h,
