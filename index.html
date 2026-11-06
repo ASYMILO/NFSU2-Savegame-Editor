@@ -105,7 +105,11 @@
       <p class="muted">The game has one tuning tab per race type. Pick the tab on the Performance Tuning screen, then do the steps from top to bottom.
         <span ng-if="tuner.fromC">No save: press C first where it says C. Then the game starts from the same values as here.</span>
         <span ng-if="!tuner.fromC">The steps start from the values in your save.</span></p>
-      <article class="hand-card tuner-card" ng-repeat="card in tuner.cards track by card.title">
+      <div class="dyno-setups" role="tablist" aria-label="Game tabs">
+        <button type="button" role="tab" ng-repeat="card in tuner.cards track by card.title" ng-class="{ active: tuner.card === $index }"
+                ng-attr-aria-selected="{{ tuner.card === $index ? 'true' : 'false' }}" ng-click="tuner.card = $index">{{ card.title }}</button>
+      </div>
+      <article class="hand-card tuner-card" ng-repeat="card in tuner.cards track by card.title" ng-if="tuner.card === $index">
         <h3>{{ card.title }}</h3>
         <p class="tuner-uses" ng-repeat="u in card.uses track by $index">{{ u }}</p>
         <p class="tuner-same" ng-if="card.setups.length > 1">Same plan for these tabs: set each of them the same way.</p>

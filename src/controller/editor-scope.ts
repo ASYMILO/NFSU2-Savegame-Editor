@@ -258,6 +258,8 @@ export interface TunerView {
   canWrite: boolean;
   written: boolean;
   cards: TunerCardView[];
+  /** The card on show (one game tab at a time). */
+  card: number;
 }
 
 /** Top-level tuning tab. */

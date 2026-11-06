@@ -32,13 +32,13 @@ const WORKERS = Math.max(1, Math.min(SETUP_COUNT, (navigator.hardwareConcurrency
 export function attachTuner($scope: EditorScope, api: TunerApi): () => void {
   $scope.view = 'tuner';
   $scope.tuner = {
-    source: 'list', slots: [], slot: null, cars: [], carHash: 0,
+    source: 'save', slots: [], slot: null, cars: [], carHash: 0,
     levels: PART_LEVEL_CATEGORIES.map((c) => ({
       code: c.code, label: c.label, value: 0,
       options: [{ value: 0, label: 'None' }, ...[1, 2, 3].filter((l) => l <= c.maxLevel).map((l) => ({ value: l, label: ['Street', 'Pro', 'Extreme'][l - 1] }))],
     })),
     pref: 'race', prefs: PREFERENCES, busy: false, progress: '', error: '', stale: false, carName: '', fromC: true,
-    canWrite: false, written: false, cards: [],
+    canWrite: false, written: false, cards: [], card: 0,
   };
   const t = $scope.tuner;
   let results: TabResult[] = [];
@@ -81,7 +81,7 @@ export function attachTuner($scope: EditorScope, api: TunerApi): () => void {
   function clear(): void {
     runToken++;
     results = [];
-    t.cards = []; t.busy = false; t.progress = ''; t.error = ''; t.stale = false; t.written = false;
+    t.cards = []; t.card = 0; t.busy = false; t.progress = ''; t.error = ''; t.stale = false; t.written = false;
   }
 
   $scope.tunerChanged = function (): void {
