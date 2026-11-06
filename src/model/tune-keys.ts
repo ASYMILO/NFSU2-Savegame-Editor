@@ -466,12 +466,61 @@ export class NitroScreen {
     const r = this.rows;
     const nv = dir > 0 ? Math.min(f(this.widget + r.step), r.hi) : Math.max(f(this.widget - r.step), r.lo);
     if (f(nv) === f(this.widget)) return null;
+    return this.to(nv);
+  }
+
+  /** The screen with the duration set to `seconds` (clamped to the box), bytes as the game's setter writes them. */
+  to(seconds: number): NitroScreen {
+    const r = this.rows, nv = clamp32(f(seconds), r.lo, r.hi);
     const setup = this.setup.slice();
     setup[16] = encodeGearByte(nv, r.def, r.lo, r.hi);
     const other = f(r.def2 - f(f(f(nv - r.def) / f(r.hi - r.lo)) * f(r.hi2 - r.lo2)));
     setup[17] = encodeGearByte(other, r.def2, r.lo2, r.hi2);
     return new NitroScreen(r, setup, nv);
   }
+
+  /** The box in seconds and the step of one key (what the screen shows as duration). */
+  get scale(): { min: number; max: number; step: number } { return { min: this.rows.lo, max: this.rows.hi, step: this.rows.step }; }
+
+  /** Duration in seconds that a duration byte stands for. */
+  secondsOf(byte: number): number {
+    const r = this.rows, t = Math.max(-1, Math.min(1, f(f(byte - 100) * f(0.01))));
+    return clamp32(f(f(f(r.hi - r.lo) * f(t)) + r.def), r.lo, r.hi);
+  }
 }
 
 interface NitroRows { lo: number; hi: number; def: number; step: number; lo2: number; hi2: number; def2: number }
+
+/** Shown scale of a scalar row: physical -> the number on the screen (float32 like FUN_00401790). */
+const rowToShown = (i: RowInfo, x: number): number => lerp(x, i.absMin, i.absMax, i.dispLo, i.dispHi);
+const rowFromShown = (i: RowInfo, x: number): number => lerp(x, i.dispLo, i.dispHi, i.absMin, i.absMax);
+
+/** The number the screen shows for a byte (gears: km/h with the current final drive). */
+export function rowShown(info: RowInfo, byte: number): number {
+  const t = Math.max(-1, Math.min(1, f(f(byte - 100) * f(0.01))));
+  const v = clamp32(f(f(f(info.max - info.min) * f(t)) + info.def), info.absMin, info.absMax);
+  return info.factor ? f(info.factor / v) : rowToShown(info, v);
+}
+
+/** The box of a row in shown numbers, low to high, and the size of one key. */
+export function rowScale(info: RowInfo): { min: number; max: number; step: number } {
+  const a = info.factor ? f(info.factor / info.max) : rowToShown(info, info.min);
+  const b = info.factor ? f(info.factor / info.min) : rowToShown(info, info.max);
+  const min = Math.min(a, b), max = Math.max(a, b);
+  return { min, max, step: f(f(max - min) * f(1 / 30)) };
+}
+
+/**
+ * Mode B for one row: the setup with the row at the shown number (clamped to its box), bytes as the game's setter writes them.
+ * A gear moves its neighbours to keep the spacing, like the game.
+ */
+export function setRowShown(model: DynoModel, setup: ArrayLike<number>, param: number, shown: number): Uint8Array | null {
+  if (!Number.isFinite(shown)) return null;
+  if (param === 16 || param === 17) return NitroScreen.open(model, setup)?.to(shown).setupBytes() ?? null;
+  const info = rowInfo(model, setup, param);
+  if (!info) return null;
+  if (info.factor) return model.withGearRatioKept(setup, null, param, clamp32(f(info.factor / f(shown)), info.min, info.max)).setup;
+  const out = Uint8Array.from(setup);
+  out[param] = encodeGearByte(clamp32(rowFromShown(info, f(shown)), info.min, info.max), info.def, info.min, info.max);
+  return out;
+}

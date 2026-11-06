@@ -4,7 +4,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { DynoModel, findCar, parseGameData, type CurveKind } from '../model/dyno.js';
 import { defaultSetup } from '../model/legal-opt.js';
 import { formatHandPlan, planHandInput } from '../model/hand-input.js';
-import { CurveScreen, pressFinalDrive } from '../model/tune-keys.js';
+import { CurveScreen, NitroScreen, openRow, pressFinalDrive, pressRowState, resetRow, rowInfo } from '../model/tune-keys.js';
 
 const GAME_BUN = process.env.NFSU2_GLOBALB ?? 'C:/Program Files (x86)/EA GAMES/Need for Speed Underground 2/GLOBAL/GLOBALB.BUN';
 const SKIP = !existsSync(GAME_BUN) && 'GLOBALB.BUN (set NFSU2_GLOBALB) missing';
@@ -44,6 +44,21 @@ test('mode A: the planned presses, replayed on a fresh screen, give the planned 
         assert.equal(p.presses, p.passes.flat().reduce((n, x) => n + Math.abs(x), 0));
         planned++;
         setup = s.setupBytes();
+      } else if (p.row) {
+        // number sliders: the same keys on a fresh visit give the planned bytes
+        const runs = p.passes.map((r) => r[0]).filter(Boolean);
+        if (p.row.param === 16) {
+          let n = NitroScreen.open(model, setup)!;
+          for (const run of runs) for (let k = 0; k < Math.abs(run); k++) n = n.press(run > 0 ? 1 : -1)!;
+          setup = n.setupBytes();
+        } else {
+          const info = rowInfo(model, setup, p.row.param)!;
+          let st = p.start === 'C' ? resetRow(model, setup, p.row.param) : openRow(model, setup);
+          for (const run of runs) for (let k = 0; k < Math.abs(run); k++) st = pressRowState(model, info, st, run > 0 ? 1 : -1)!;
+          setup = st.setup;
+        }
+        assert.deepEqual(Array.from(setup), Array.from(p.setup), `${car.name}: row ${p.row.param}`);
+        planned++;
       } else {
         let b = p.start === 'C' ? Uint8Array.from(setup, (v, i) => (i === 9 ? 100 : v)) : setup;
         for (const run of p.passes.map((r) => r[0]).filter(Boolean)) {
