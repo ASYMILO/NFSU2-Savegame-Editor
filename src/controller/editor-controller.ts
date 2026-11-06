@@ -497,15 +497,32 @@ export function EditorController($scope: EditorScope): void {
     };
   }
 
+  /** The working bytes of a backup profile (career, with slots 6-10 merged when the ZIP has its garage). */
+  function profileBytes(index: number): Uint8Array {
+    const profile = backup!.profiles[index];
+    let bytes = backup!.work.get(index);
+    if (!bytes) {
+      const career = backup!.zip.entries[profile.careerEntry].data;
+      bytes = profile.garageState === 'loaded' ? mergeGarage(career, backup!.zip.entries[profile.garageEntry].data) : career.slice();
+      backup!.work.set(index, bytes);
+    }
+    return bytes;
+  }
+
+  /**
+   * The profile a ZIP opens with: the first career profile. An nfsu2.xyz backup also holds DVD and magazine files of
+   * 1,048,612 bytes (no cars) that can sort first, e.g. "ASYMILO DVD 1" before "ASYMILO"; a career file is PROFILE_SIZE.
+   */
+  function firstCareerProfile(): number {
+    if (!backup) return 0;
+    const i = backup.profiles.findIndex((p) => backup!.zip.entries[p.careerEntry].data.length === PROFILE_SIZE);
+    return i < 0 ? 0 : i;
+  }
+
   function openBackupProfile(index: number): void {
     if (!backup) return;
     const profile = backup.profiles[index];
-    let bytes = backup.work.get(index);
-    if (!bytes) {
-      const career = backup.zip.entries[profile.careerEntry].data;
-      bytes = profile.garageState === 'loaded' ? mergeGarage(career, backup.zip.entries[profile.garageEntry].data) : career.slice();
-      backup.work.set(index, bytes);
-    }
+    const bytes = profileBytes(index);
     backup.current = index;
     resetEditor();
     backupView();
@@ -561,7 +578,7 @@ export function EditorController($scope: EditorScope): void {
                   return;
                 }
                 backup = { zip, profiles, work: new Map(), current: 0 };
-                openBackupProfile(0);
+                openBackupProfile(firstCareerProfile());
               });
             })
             .catch((err: unknown) => {
@@ -822,7 +839,7 @@ export function EditorController($scope: EditorScope): void {
     .then((buf) => {
       $scope.$evalAsync(() => { if (!game) applyGameData(new Uint8Array(buf), 'GLOBALB.BUN (local copy)'); });
     })
-    .catch(() => { /* no local copy: the user picks the file */ });
+    .catch(() => { $scope.$evalAsync(() => { $scope.tuning.dyno.localMissing = true; }); /* no local copy: the user picks the file */ });
 
   // ---- without a save ----------------------------------------------------------------------------
 

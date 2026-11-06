@@ -6,7 +6,7 @@ import { defaultSetup } from '../model/legal-opt.js';
 import type { SliderPlan } from '../model/hand-input.js';
 import { CurveScreen, NitroScreen, openRow, pressFinalDrive, pressRowState, resetRow, rowInfo } from '../model/tune-keys.js';
 import {
-  categoryScreens, curveKeys, groupTabs, legalOptions, menuOrder, planTab, SCREEN_ORDER, screenPlans, startAfterC, tunerSteps, unlockParts, type TabResult,
+  categoryScreens, curveKeys, groupTabs, legalOptions, menuOrder, planTab, RESET, SCREEN_ORDER, screenPlans, startAfterC, tunerSteps, unlockParts, type TabResult,
 } from '../model/tuner.js';
 import { PERF_PARTS } from '../data/perf-parts.js';
 import { installedForLevels, withAero } from '../model/virtual-save.js';
@@ -100,7 +100,7 @@ test('no save: every step starts with C, and every curve and drivetrain row Opti
     // key C on a row of the start changes nothing: the start is the state after C
     for (const param of model.gearingParameters) assert.deepEqual(Array.from(resetRow(model, start, param).setup), Array.from(start), `${car.name}: row ${param}`);
     const steps = tunerSteps(model, planTab(model, 0, start, target(model, start), 'race'), true);
-    for (const s of steps) assert.match(s.keys, /^Reset \(key C\)/, `${car.name}: ${s.screen} ${s.row}`);
+    for (const s of steps) assert.ok(s.keys.startsWith(RESET), `${car.name}: ${s.screen} ${s.row}`);
     const curves = (['ecu', 'turbo'] as const).filter((k) => model.curve(start, k)).length;
     assert.ok(steps.length >= curves + model.gearingParameters.filter((p) => rowInfo(model, start, p)).length, `${car.name}: rows missing`);
   }

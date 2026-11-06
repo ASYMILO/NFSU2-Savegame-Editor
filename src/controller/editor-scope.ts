@@ -144,6 +144,8 @@ export interface GearChart {
 export interface DynoView {
   gameName: string;
   gameError: string;
+  /** The page's own server has no copy of GLOBALB.BUN (./game/GLOBALB.BUN did not load). */
+  localMissing?: boolean;
   setup: DynoEvent;
   setupNames: string[];
   strategy: string;
@@ -231,13 +233,13 @@ export interface TunerCardView {
   /** Dyno numbers before (save, or after the reset) and after mode A. */
   nowLabel: string;
   compare: { label: string; now: string; after: string }[];
-  /** Mode B in one line, with A minus B. */
-  bLine: string;
+  /** What "best" means for this card's race, in plain words (the optimizer's own choice). */
+  goal: string;
   presses: number;
   /** Every screen of the game's menu, in its order. */
   screens: {
     name: string; state: 'set' | 'ok' | 'keep' | 'locked'; badge: string; text: string;
-    steps: { screen: string; row: string; keys: string; shows: string; from?: string; presses: number; chart?: CurveChart }[];
+    steps: { screen: string; row: string; keys: string; shows: string; from?: string; presses: number; chart?: CurveChart; done?: boolean }[];
   }[];
   note: string;
   table: HandRow[];
@@ -254,12 +256,12 @@ export interface TunerNowView {
   /** Slider values per tab, as the game's screens show them. */
   columns: string[];
   settings: { screen: string; row: string; values: string[] }[];
-  /** Empty when the car can be tuned; otherwise why Optimize has nothing to do. */
+  /** Empty when the car can be tuned; otherwise what to pick first (shown as a hint, not an error). */
   problem: string;
 }
 
 /** One preference slider (the player's choice for a screen Optimize does not tune). */
-export interface TunerFeelView { key: string; screen: string; label: string; low: string; high: string; basis: string }
+export interface TunerFeelView { key: string; screen: string; label: string; low: string; high: string; basis: string; when: string; min: number; max: number; limit: string }
 
 /** The Tuner screen: steps revealed one by one, one Optimize, a card per game tab, preferences after the result. */
 export interface TunerView {
@@ -276,6 +278,11 @@ export interface TunerView {
   prefs: { key: string; label: string; text: string }[];
   busy: boolean;
   progress: string;
+  /** Race types done of 5 while Optimize runs, and the seconds since it started. */
+  done: number;
+  seconds: number;
+  /** The preferences box is open (kept open while the cards are rebuilt). */
+  prefsOpen: boolean;
   error: string;
   /** The save changed after the last Optimize. */
   stale: boolean;
@@ -413,7 +420,7 @@ export interface EditorScope extends angular.IScope {
   view: 'tuner' | 'editor';
   tuner: TunerView;
   tunerChanged(): void;
-  tunerOptimize(): void;
+  tunerOptimize(keepView?: boolean): void;
   tunerPref(): void;
   tunerFeel(): void;
   tunerTab(card: number): void;

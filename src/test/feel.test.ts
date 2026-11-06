@@ -49,3 +49,22 @@ test('locked engine screen: what-if with the part that opens it', { skip: SKIP }
   assert.ok(Number.isFinite(w!.withPart.topKmh) && Number.isFinite(w!.now.topKmh));
   console.log(`what-if ECU on 3000GT (TR Pro): ${w!.part}`, JSON.stringify(w!.now), JSON.stringify(w!.withPart));
 });
+
+test('feel sliders open only the sides where every row has room (rear grip only down, Street/Pro downforce only down)', { skip: SKIP }, () => {
+  const game = parseGameData(new Uint8Array(readFileSync(GAME_BUN)));
+  const car = game.cars.find((c) => c.name === '3000GT')!;
+  for (const level of [1, 2, 3]) {
+    const levels = { EC: 2, TU: 2, TR: 2, SU: level, BR: level, TI: level, AEF: level, AES: level };
+    const model = new DynoModel(game, car, withAero(installedForLevels(levels), levels), new Array(9).fill(0));
+    const start = startAfterC(model);
+    const by = Object.fromEntries(feelSliders(model, start, [0]).map((s) => [s.key, s]));
+    // tire grip: the box ends at what the tires give (setup-bytes.md l.53), after C the row sits there
+    assert.deepEqual([by.rearGrip.min, by.rearGrip.max], [-100, 0], `L${level} rear grip`);
+    assert.equal(withFeel(model, start, start, { rearGrip: 100 })[20], start[20], `L${level} rear grip right does nothing`);
+    // downforce L1/L2 only lowers (front sits at the top of the shared box), L3 has room both ways
+    assert.deepEqual([by.downforce.min, by.downforce.max], level < 3 ? [-100, 0] : [-100, 100], `L${level} downforce`);
+    const up = withFeel(model, start, start, { downforce: 100 });
+    if (level < 3) assert.deepEqual([up[21], up[22]], [start[21], start[22]], `L${level}: no one-axle move`);
+    else assert.ok(up[21] > start[21] && up[22] > start[22], 'L3: both axles up');
+  }
+});

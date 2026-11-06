@@ -13,10 +13,22 @@ import { resetRow, rowInfo } from './tune-keys.js';
 export type Preference = 'race' | 'launch' | 'accel' | 'top';
 export const PREFERENCES: { key: Preference; label: string; text: string }[] = [
   { key: 'race', label: 'Best for each race', text: 'Each tab gets the goal of its own race type. This is the default.' },
-  { key: 'launch', label: 'Strong pull from a stop', text: 'Same goals, but the engine keeps at least 90 % of its factory pull at low revs. Our rule of thumb, not checked in the game.' },
+  { key: 'launch', label: 'Strong pull from a stop', text: 'Same goals, but the engine keeps at least 90 % of its factory pull at low revs. The 90 % is our own pick, not a number from the game.' },
   { key: 'accel', label: 'Quick acceleration', text: 'Every tab aims at short 0-60 and 0-100 times.' },
   { key: 'top', label: 'High top speed', text: 'Every tab counts top speed most.' },
 ];
+
+/**
+ * What "best" means for each goal, in plain words. These are the optimizer's own weights (legal-opt.ts OBJECTIVES l.11-17):
+ * our choice, not taken from the game; the game has no score for a setup. Power has a tiny weight there (only to break ties).
+ */
+export const GOAL_WORDS: Record<string, string> = {
+  circuit: 'quick 0-60 and 0-100 first, then top speed',
+  drag: 'the shortest quarter mile',
+  drift: 'quick 0-60 and strong pull in the middle revs',
+  streetx: 'quick 0-60 and 0-100',
+  url: 'top speed first, then 0-60 and 0-100',
+};
 
 /** Objective and launch rule of a tab for a preference (`launchMin` is the editor's old "Protect launch" value). */
 export function legalOptions(pref: Preference, setup: number): { objective: string; launchMin: number | null } {
@@ -181,7 +193,7 @@ export interface TunerStep {
 }
 
 /** Key C on a tuning screen ("Reset to default"); it resets the selected row, or all 9 bars of a graph (native-menu-map.md l.174-181). */
-export const RESET = 'Reset (key C)';
+export const RESET = 'C (back to default)';
 
 /**
  * Every key on an ECU / Turbo graph for a plan's rounds: C, then bar 1 to 9 per round (UP / DOWN as planned, RIGHT to the
@@ -202,7 +214,7 @@ export function curveKeys(passes: number[][]): string[] {
   return keys;
 }
 
-const runText = (runs: number[]): string => runs.map((n) => `${n > 0 ? 'RIGHT' : 'LEFT'} ×${Math.abs(n)}`).join(', then ');
+const runText = (runs: number[]): string => runs.map((n) => `${n > 0 ? 'RIGHT' : 'LEFT'} ${Math.abs(n)} time${Math.abs(n) === 1 ? '' : 's'}`).join(', then ');
 
 /**
  * The steps of a plan, screen by screen in menu order.
@@ -271,15 +283,15 @@ export function screenPlans(model: DynoModel, setups: number[], steps: TunerStep
   return SCREENS.map(({ name, params }) => {
     const own = steps.filter((s) => s.screen === name);
     const tuned = TUNED.has(name);
-    if (own.length) return { name, state: 'set', text: tuned ? '' : 'Set by your sliders under Preferences.', steps: own };
+    if (own.length) return { name, state: 'set', text: tuned ? '' : 'Set by your preferences (below the steps).', steps: own };
     if (!params.some((p) => model.tuningRecords.has(p))) {
-      const then = tuned ? 'Then Optimize tunes it.' : 'Optimize does not tune it.';
+      const then = tuned ? 'Then the Tuner sets it.' : 'The Tuner does not set it.';
       return { name, state: 'locked', text: `Buy ${unlockParts(model.game, params).join(' or ')} to open it. ${then}${whatIf[name] ? ` ${whatIf[name]}` : ''}`, steps: [] };
     }
-    if (tuned) return { name, state: 'ok', text: 'Optimize tunes it. Already right for this race.', steps: [] };
+    if (tuned) return { name, state: 'ok', text: 'The Tuner checked it: already right for this race.', steps: [] };
     // drift and Street X presets zero nitrous duration (docs/setup-bytes.md l.103, FUN_005b4dc0)
     if (name === 'Nitrous' && setups.every((k) => k === 2 || k === 3)) return { name, state: 'keep', text: 'This race turns nitrous off.', steps: [] };
-    return { name, state: 'keep', text: 'Optimize does not tune it. Use its slider under Preferences, or set it yourself.', steps: [] };
+    return { name, state: 'keep', text: 'The Tuner does not set it for speed. Use your preferences below, or leave it.', steps: [] };
   });
 }
 

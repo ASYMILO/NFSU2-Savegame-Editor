@@ -530,3 +530,14 @@ body {
 .tuner-final { margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--color-border); }
 .tuner-now-settings th:nth-child(-n+2), .tuner-now-settings td:nth-child(-n+2) { text-align: left; }
 .tuner-feel-head { margin-top: 16px; }
+.tuner-scroll { max-width: 100%; overflow-x: auto; }
+.tuner-progress { display: flex; align-items: center; gap: 12px; margin-top: 10px; font-size: 13px; color: var(--color-text); }
+.tuner-progress progress { width: 220px; height: 10px; accent-color: var(--color-primary); }
+.tuner-intro { margin: 0 0 8px; padding-left: 20px; font-size: 13px; color: var(--color-text); }
+.tuner-check { display: flex; gap: 8px; align-items: flex-start; cursor: pointer; }
+.tuner-check input { margin-top: 3px; accent-color: var(--color-primary); }
+.tuner-step.done > .tuner-check > span { color: var(--color-text-muted); text-decoration: line-through; }
+.tuner-fold { padding: 6px 0; border: 0; background: none; color: var(--color-text-strong); font: inherit; font-weight: 600; cursor: pointer; }
+.tuner-feel small { display: block; margin-top: 2px; }
+.tuner-final h3 { margin: 0 0 8px; }
+.tuner-card .dyno-sheet { white-space: pre-wrap; }

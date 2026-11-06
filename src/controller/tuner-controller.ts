@@ -9,13 +9,14 @@ import { DynoModel, findCar, readSlotDyno, setSetupTuning, type GameData } from 
 import { getCarTypeHash, slotState } from '../model/slots.js';
 import { slotCount } from '../model/layout.js';
 import { TRAFFIC_CARS } from '../data/traffic-cars.js';
+import { carName } from '../data/car-names.js';
 import { AERO_PARTS, buildVirtualSave, installedForLevels, levelsOf, PART_LEVEL_CATEGORIES, withAero } from '../model/virtual-save.js';
 import { gameNumbers, type GameNumbers } from '../model/legal-opt.js';
 import { ROW_LABELS, ROW_ORDER, shownText } from '../model/hand-input.js';
 import { NitroScreen, rowInfo } from '../model/tune-keys.js';
 import { feelSliders, withFeel, type Feel } from '../model/feel.js';
 import {
-  categoryScreens, groupTabs, lockedWhatIf, optimizeTab, planTab, PREFERENCES, SCREENS, screenPlans, SETUP_COUNT, startAfterC,
+  categoryScreens, GOAL_WORDS, groupTabs, legalOptions, lockedWhatIf, optimizeTab, planTab, PREFERENCES, SCREENS, screenPlans, SETUP_COUNT, startAfterC,
   TAB_NAMES, TAB_USES, TUNED, tunerSteps, type Preference, type TabResult,
 } from '../model/tuner.js';
 import { curveChart } from './editor-controller.js';
@@ -38,7 +39,9 @@ const LEVEL_WORDS = ['None', 'Street', 'Pro', 'Extreme'];
 
 const sec = (v: number | null): string => (v === null ? '–' : `${v.toFixed(2)} s`);
 const kmh = (v: number): string => `${v.toFixed(1)} km/h`;
-const bhp = (v: number): string => `${v.toFixed(1)} bhp`;
+// the game's dyno screen shows 0-60 / 0-100 without a unit, top speed in km/h and power in kW (tuner repo
+// native/runs/dyno_check_20261106/results_A_all.png, docs/dyno-check-3000gt.md), so the Tuner shows the same
+const kw = (v: number): string => `${v.toFixed(1)} kW`;
 
 /** @returns `sync`, which the editor calls after the save or the game data changed. */
 export function attachTuner($scope: EditorScope, api: TunerApi): () => void {
@@ -55,7 +58,7 @@ export function attachTuner($scope: EditorScope, api: TunerApi): () => void {
         options: [{ value: 0, label: 'None' }, ...[1, 2, 3].map((l) => ({ value: l, label: `Level ${l}` }))],
       })),
     ],
-    now: null, pref: 'race', prefs: PREFERENCES, busy: false, progress: '', error: '', stale: false, carName: '', fromC: true,
+    now: null, pref: 'race', prefs: PREFERENCES, busy: false, progress: '', done: 0, seconds: 0, prefsOpen: false, error: '', stale: false, carName: '', fromC: true,
     canDownload: false, cards: [], tabs: [], card: 0, feel: {}, sliders: [],
   };
   const t = $scope.tuner;
@@ -69,11 +72,15 @@ export function attachTuner($scope: EditorScope, api: TunerApi): () => void {
   let resultSave: Uint8Array | null = null;
   let pool: Worker[] | null = null;
   let poolGame: Uint8Array | null = null;
+  /** Optimize's result per car, start, tab and goal: the same question again (e.g. a goal changed back) is instant. */
+  const cache = new Map<string, { bytes: number[]; sheet: string }>();
+  let clock: ReturnType<typeof setInterval> | null = null;
 
   function refreshLists(): void {
     const game = api.game(), save = api.save();
     if (game) for (const level of t.levels) level.hint = partHint(game, level.code);
-    t.cars = game ? game.cars.filter((c) => !TRAFFIC_CARS.some((x) => x.hash === c.hash)).map((c) => ({ hash: c.hash, name: c.name })) : [];
+    t.cars = game ? game.cars.filter((c) => !TRAFFIC_CARS.some((x) => x.hash === c.hash)).map((c) => ({ hash: c.hash, name: carName(c.name) }))
+      .sort((a, b) => a.name.localeCompare(b.name)) : [];
     // no default car: the list starts empty, the user picks
     if (!t.cars.some((c) => c.hash === t.carHash)) t.carHash = 0;
     t.slots = [];
@@ -83,7 +90,7 @@ export function attachTuner($scope: EditorScope, api: TunerApi): () => void {
         const hash = getCarTypeHash(save, i);
         if (TRAFFIC_CARS.some((x) => x.hash === hash)) continue;
         const car = game ? findCar(game, hash) : null;
-        t.slots.push({ index: i, name: `Slot ${i + 1}: ${car ? car.name : 'unknown car'}` });
+        t.slots.push({ index: i, name: `Slot ${i + 1}: ${car ? carName(car.name) : 'unknown car'}` });
       }
     }
     // a save with one car: that car; with more: the user picks
@@ -96,20 +103,30 @@ export function attachTuner($scope: EditorScope, api: TunerApi): () => void {
     const now = `${api.save() ? 1 : 0}|${$scope.fileName}|${$scope.backup?.current ?? ''}|${$scope.tuning.dyno.gameName}`;
     refreshLists();
     if (now !== seen) {
-      // a new save: the car comes from it
-      if (now.startsWith('1') && t.slots.length) t.source = 'save';
+      // a new save: the car comes from it; no save: pick from the lists (by hand is the default way, it needs no save)
+      if (now.startsWith('1')) t.source = 'save';
+      else if (!t.source) t.source = 'list';
       seen = now;
       clear(true);
       refreshNow();
     } else if (t.cards.length && api.save() !== resultSave) t.stale = true;
   }
 
-  function clear(dropFeel: boolean): void {
+  function stopClock(): void {
+    if (clock) clearInterval(clock);
+    clock = null;
+  }
+
+  /** @param keepView keep the cards on show while Optimize runs again (a goal change): the page does not jump. */
+  function clear(dropFeel: boolean, keepView = false): void {
     runToken++;
+    stopClock();
+    t.busy = false; t.progress = ''; t.error = ''; t.done = 0;
+    if (keepView) return;
     results = [];
     base = [];
     if (dropFeel) feels = [];
-    t.cards = []; t.tabs = []; t.card = 0; t.busy = false; t.progress = ''; t.error = ''; t.stale = false; t.sliders = []; t.feel = {};
+    t.cards = []; t.tabs = []; t.card = 0; t.stale = false; t.sliders = []; t.feel = {};
   }
 
   /** The chosen car, or why there is none yet ('' = nothing chosen). */
@@ -119,6 +136,7 @@ export function attachTuner($scope: EditorScope, api: TunerApi): () => void {
     let sd: ReturnType<typeof readSlotDyno>, saved: Uint8Array[] | null;
     const save = api.save();
     if (t.source === 'save') {
+      if (save && !t.slots.length) return $scope.backup ? 'This profile has no cars. Pick another profile above.' : 'This save has no cars.';
       if (!save || t.slot === null) return '';
       sd = readSlotDyno(save, t.slot);
       saved = sd.setups;
@@ -130,7 +148,7 @@ export function attachTuner($scope: EditorScope, api: TunerApi): () => void {
     } else return '';
     const record = findCar(game, sd.hash);
     if (!record) return 'This car is not in the loaded game data.';
-    return { model: new DynoModel(game, record, sd.installed, sd.uniques), carName: record.name, hash: sd.hash, installed: sd.installed, uniques: sd.uniques, saved };
+    return { model: new DynoModel(game, record, sd.installed, sd.uniques), carName: carName(record.name), hash: sd.hash, installed: sd.installed, uniques: sd.uniques, saved };
   }
 
   /** "Your car now": parts, dyno and slider values as they are (save) or at the factory setting (no save). */
@@ -145,7 +163,7 @@ export function attachTuner($scope: EditorScope, api: TunerApi): () => void {
     const columns = c.saved ? TAB_NAMES : ['Factory setting'];
     const dyno = setups.map((s, k) => {
       const g = gameNumbers(model.evaluate(s));
-      return { tab: columns[k], t60: sec(g.t60), t100: sec(g.t100), top: kmh(g.topKmh), power: bhp(g.powerBhp) };
+      return { tab: columns[k], t60: sec(g.t60), t100: sec(g.t100), top: kmh(g.topKmh), power: kw(g.powerKw) };
     });
     const settings: TunerNowView['settings'] = [];
     for (const name of SCREENS.map((s) => s.name)) {
@@ -159,7 +177,8 @@ export function attachTuner($scope: EditorScope, api: TunerApi): () => void {
     const tunable = model.ecuTunable || model.turboTunable || model.gearingParameters.length > 0;
     t.now = {
       carName: c.carName, parts, missing: t.levels.filter((l) => !levels[l.code]).map((l) => l.label), dyno, columns, settings,
-      problem: tunable ? '' : 'No ECU, Turbo or Transmission part: Optimize has nothing to tune. Buy one of them first.',
+      problem: tunable ? '' : c.saved ? 'This car has no ECU, Turbo or Transmission part yet. Buy one in the game first: only those can be tuned for speed.'
+        : 'Pick the parts your car has (below). At least an ECU, Turbo or Transmission part is needed: only those can be tuned for speed.',
     };
   }
 
@@ -202,7 +221,7 @@ export function attachTuner($scope: EditorScope, api: TunerApi): () => void {
 
   function show(keepCard: number): void {
     if (!src) return;
-    t.cards = cards(src, results);
+    t.cards = cards(src, results, t.pref as Preference);
     // the game's five tabs in its order; tabs with the same plan open the same card
     t.tabs = TAB_NAMES.map((name, setup) => ({ name, short: TAB_USES[setup].short, card: t.cards.findIndex((c) => c.setups.includes(setup)) }));
     $scope.tunerTab(Math.min(keepCard, t.cards.length - 1));
@@ -215,7 +234,10 @@ export function attachTuner($scope: EditorScope, api: TunerApi): () => void {
     const first = view.setups[0];
     feels[first] = feels[first] ?? {};
     t.feel = feels[first];
-    t.sliders = feelSliders(src.model, src.starts[first], view.setups).map(({ key, screen, label, low, high, basis }) => ({ key, screen, label, low, high, basis }));
+    t.sliders = feelSliders(src.model, src.starts[first], view.setups)
+      .map(({ key, screen, label, low, high, basis, when, min, max, limit }) => ({ key, screen, label, low, high, basis, when, min, max, limit }));
+    // a range input with no value sits in the middle of its box; 0 (= as now) is the left or right end on a one-sided slider
+    for (const sl of t.sliders) t.feel[sl.key] = t.feel[sl.key] ?? 0;
   };
 
   $scope.tunerFeel = function (): void {
@@ -230,40 +252,54 @@ export function attachTuner($scope: EditorScope, api: TunerApi): () => void {
   };
 
   $scope.tunerPref = function (): void {
-    // another goal: Optimize again, the sliders stay
-    if (t.cards.length || t.busy) $scope.tunerOptimize();
+    // another goal: Optimize again, the sliders stay, the cards stay on show until the new ones are ready
+    if (t.cards.length || t.busy) $scope.tunerOptimize(true);
   };
 
-  $scope.tunerOptimize = function (): void {
+  $scope.tunerOptimize = function (keepView = false): void {
     const s = source();
     const keepCard = t.card;
-    clear(false);
+    clear(false, keepView && t.cards.length > 0);
     if (typeof s === 'string') { t.error = s; return; }
-    src = s;
     const token = runToken, pref = t.pref as Preference;
     const save = api.save();
-    t.busy = true;
-    t.carName = s.carName;
-    t.fromC = s.fromC;
-    t.canDownload = !s.fromC && save !== null;
+    const fresh: TabResult[] = [], nextBase: Uint8Array[] = [];
+    const keyOf = (setup: number): string =>
+      [s.hash, s.installed.map(Number).join(''), s.uniques.join(','), Array.from(s.starts[setup]).join(','), setup, pref].join('|');
     let done = 0;
-    t.progress = `Working on 5 tabs… 0 of 5 done. About 20 s per tab.`;
-    const sheets: string[] = [];
+    t.busy = true;
+    t.seconds = 0;
+    const t0 = Date.now();
+    clock = setInterval(() => $scope.$evalAsync(() => { if (token === runToken) t.seconds = Math.round((Date.now() - t0) / 1000); }), 1000);
     const finish = (setup: number, out: { bytes: number[]; sheet: string } | { error: string }): void => {
       if (token !== runToken) return;
-      if ('error' in out) { t.error = `${TAB_NAMES[setup]}: ${out.error}`; t.busy = false; runToken++; return; }
-      base[setup] = Uint8Array.from(out.bytes);
-      sheets[setup] = out.sheet;
-      results[setup] = plan(s, setup, out.sheet);
+      if ('error' in out) { t.error = `${TAB_NAMES[setup]}: ${out.error}`; t.busy = false; stopClock(); runToken++; return; }
+      cache.set(keyOf(setup), out);
+      nextBase[setup] = Uint8Array.from(out.bytes);
+      fresh[setup] = planTab(s.model, setup, s.starts[setup], withFeel(s.model, s.starts[setup], nextBase[setup], feels[setup] ?? {}), pref, out.sheet);
       done++;
-      t.progress = `Working on 5 tabs… ${done} of 5 done.`;
+      t.done = done;
       if (done === SETUP_COUNT) {
         t.busy = false;
-        t.progress = '';
+        stopClock();
+        src = s;
+        base = nextBase;
+        results = fresh;
+        t.carName = s.carName;
+        t.fromC = s.fromC;
+        t.canDownload = !s.fromC && save !== null;
+        t.stale = false;
         resultSave = save;
         show(keepCard);
       }
     };
+    // tabs already worked out for this car, start and goal need no new run
+    const todo = [0, 1, 2, 3, 4].filter((setup) => {
+      const hit = cache.get(keyOf(setup));
+      if (hit) finish(setup, hit);
+      return !hit;
+    });
+    if (!todo.length) return;
     const job = (setup: number) => ({
       type: 'job', id: token * 10 + setup, hash: s.hash, installed: s.installed, uniques: s.uniques,
       start: Array.from(s.starts[setup]), setup, pref,
@@ -280,8 +316,8 @@ export function attachTuner($scope: EditorScope, api: TunerApi): () => void {
       }, 30);
     };
     const pw = workers();
-    if (!pw) { onMain([0, 1, 2, 3, 4]); return; }
-    const queue = [0, 1, 2, 3, 4];
+    if (!pw) { onMain(todo.slice()); return; }
+    const queue = todo.slice();
     const failed: number[] = [];
     pw.forEach((w) => {
       const run = (): void => {
@@ -332,13 +368,13 @@ function partHint(game: GameData, code: string): string {
   if (aero) return `A body-shop ${code === 'AEF' ? 'front bumper' : 'spoiler'} opens Aerodynamics (${code === 'AEF' ? 'front' : 'rear'} downforce). A stock one does not.`;
   const screens = categoryScreens(game, code);
   if (!screens.length) return 'Counts on the dyno. Opens no tuning screen.';
-  const tuned = screens.some((s) => TUNED.has(s)) ? 'Optimize tunes it.' : 'Optimize does not tune it.';
+  const tuned = screens.some((s) => TUNED.has(s)) ? 'The Tuner sets it.' : 'The Tuner does not set it.';
   // gears 10-15 have a record only for the 6-speed transmission (L3), final drive for every level
   const extra = code === 'TR' ? ' Gears only with Extreme (6-speed).' : '';
   return `Opens ${screens.join(', ')}. ${tuned}${extra} A higher level gives a wider range.`;
 }
 
-const BADGES = { set: 'Change', ok: 'Leave as is', keep: 'Leave as is', locked: 'Locked' } as const;
+const BADGES = { set: 'To do', ok: 'Nothing to do', keep: 'Nothing to do', locked: 'Needs a part' } as const;
 
 /** The chart's presses in words ("UP 3", "DOWN 1", "–") and its rows as rounds. Order as planHandInput: bar 1 to 9, round by round. */
 function pressWords(chart: CurveChart): CurveChart {
@@ -346,7 +382,7 @@ function pressWords(chart: CurveChart): CurveChart {
   return {
     ...chart,
     columns: chart.columns.map((c) => ({ ...c, presses: c.presses.map(word) })),
-    passLabels: chart.passLabels.map((_, k) => ['1st', '2nd', '3rd'][k] ?? `${k + 1}th`),
+    passLabels: chart.passLabels.map((_, k) => `${['1st', '2nd', '3rd'][k] ?? `${k + 1}th`} time`),
   };
 }
 
@@ -363,7 +399,7 @@ function whatIfLines(src: Source): Record<string, string> {
   return out;
 }
 
-function cards(src: Source, results: TabResult[]): TunerCardView[] {
+function cards(src: Source, results: TabResult[], pref: Preference): TunerCardView[] {
   const sign = (v: number | null, unit: string, digits: number): string => (v === null ? '–' : `${v > 0 ? '+' : ''}${v.toFixed(digits)} ${unit}`);
   const whatIf = whatIfLines(src);
   return groupTabs(results).map((group): TunerCardView => {
@@ -372,31 +408,34 @@ function cards(src: Source, results: TabResult[]): TunerCardView[] {
     const now = gameNumbers(src.model.evaluate(r.start));
     const steps = tunerSteps(src.model, r, src.fromC).map((s) => (s.curve && s.passes?.length
       ? { ...s, chart: pressWords(curveChart(src.model.curve(r.plan.setup, s.curve)!, 0, s.passes)) } : s));
+    // "gap" = by hand minus the save, so a minus time or a plus speed means "by hand is better"
+    const dkw = a.powerKw - b.powerKw;
     const table: HandRow[] = [
-      { label: '0–60 mph', a: sec(a.t60), b: sec(b.t60), diff: sign(diff.t60, 's', 2), zero: diff.t60 === null || Math.abs(diff.t60) < 0.005 },
-      { label: '0–100 mph', a: sec(a.t100), b: sec(b.t100), diff: sign(diff.t100, 's', 2), zero: diff.t100 === null || Math.abs(diff.t100) < 0.005 },
+      { label: '0-60', a: sec(a.t60), b: sec(b.t60), diff: sign(diff.t60, 's', 2), zero: diff.t60 === null || Math.abs(diff.t60) < 0.005 },
+      { label: '0-100', a: sec(a.t100), b: sec(b.t100), diff: sign(diff.t100, 's', 2), zero: diff.t100 === null || Math.abs(diff.t100) < 0.005 },
       { label: 'Top speed', a: kmh(a.topKmh), b: kmh(b.topKmh), diff: sign(diff.topKmh, 'km/h', 1), zero: Math.abs(diff.topKmh) < 0.05 },
-      { label: 'Power', a: bhp(a.powerBhp), b: bhp(b.powerBhp), diff: sign(diff.powerBhp, 'bhp', 1), zero: Math.abs(diff.powerBhp) < 0.05 },
+      { label: 'Power', a: kw(a.powerKw), b: kw(b.powerKw), diff: sign(Number(dkw.toFixed(1)), 'kW', 1), zero: Math.abs(dkw) < 0.05 },
     ];
-    const same = table.every((row) => row.zero);
+    for (const row of table) if (row.zero) row.diff = 'same';
     return {
       setups: group.map((x) => x.setup),
       title: names.join(' + '),
       uses: group.map((x) => ({ tab: TAB_NAMES[x.setup], career: TAB_USES[x.setup].career, quick: TAB_USES[x.setup].quick })),
       nowLabel: src.fromC ? 'After reset' : 'Now (save)',
       compare: [
-        { label: '0–60 mph', now: sec(now.t60), after: sec(a.t60) },
-        { label: '0–100 mph', now: sec(now.t100), after: sec(a.t100) },
+        { label: '0-60', now: sec(now.t60), after: sec(a.t60) },
+        { label: '0-100', now: sec(now.t100), after: sec(a.t100) },
         { label: 'Top speed', now: kmh(now.topKmh), after: kmh(a.topKmh) },
-        { label: 'Power', now: bhp(now.powerBhp), after: bhp(a.powerBhp) },
+        { label: 'Power', now: kw(now.powerKw), after: kw(a.powerKw) },
       ],
-      bLine: same ? 'The downloaded save gives the same numbers.'
-        : `The downloaded save would give ${table.map((row) => row.b).join(' · ')} (by hand minus save: ${table.map((row) => row.diff).join(' · ')}).`,
+      goal: GOAL_WORDS[legalOptions(pref, r.setup).objective] ?? '',
       presses: steps.reduce((n, s) => n + s.presses, 0),
       screens: screenPlans(src.model, group.map((x) => x.setup), steps, whatIf).map((x) => ({ ...x, badge: BADGES[x.state] })),
       note: group.some((x) => x.setup === 1) ? 'In Drag races you shift by hand. The dyno shifts by itself.' : '',
       table,
-      sheet: `${r.handSheet}\n\n${r.legalSheet}`,
+      // only the by-hand list: the optimizer's own sheet has its own entry rules ("do not reset the Drivetrain"), which
+      // differ from the steps above
+      sheet: r.handSheet,
     };
   });
 }

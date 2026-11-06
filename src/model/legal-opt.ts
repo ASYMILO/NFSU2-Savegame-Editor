@@ -465,6 +465,8 @@ export interface GameNumbers {
   torqueNm: number;
   torqueRpm: number;
   powerBhp: number;
+  /** Peak power as the game's metric dyno screen shows it (kW; tuner repo docs/dyno-check-3000gt.md). */
+  powerKw: number;
   powerRpm: number;
   quarter: number | null;
 }
@@ -479,6 +481,7 @@ export function gameNumbers(r: ReturnType<DynoModel['evaluate']>): GameNumbers {
     torqueNm: Number((Math.fround(Math.fround(r.peakTorque / 1000) * 1000) + 1e-9).toFixed(1)),
     torqueRpm: r.peakTorqueRpm,
     powerBhp: Number((Math.fround(r.peakPower * Math.fround(1.34102209)) + 1e-9).toFixed(1)),
+    powerKw:  Number((Math.fround(r.peakPower) + 1e-9).toFixed(1)),
     powerRpm: r.peakPowerRpm,
     quarter:  Number.isFinite(r.quarterMile) ? Math.round(r.quarterMile * 100) / 100 : null,
   };

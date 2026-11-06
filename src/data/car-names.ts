@@ -1,0 +1,37 @@
+/** Car names as the game shows them, by car record name. Made by scripts/car-names.mjs (GLOBALB.BUN + English.bin). */
+export const CAR_NAMES: Record<string, string> = {
+  "PEUGOT": "Peugeot 206",
+  "FOCUS": "Ford Focus",
+  "COROLLA": "Toyota Corolla",
+  "240SX": "Nissan 240SX",
+  "MIATA": "Mazda MX-5",
+  "CIVIC": "Honda Civic",
+  "PEUGOT106": "Peugeot 106",
+  "CORSA": "Vauxhall Corsa",
+  "HUMMER": "Hummer H2",
+  "NAVIGATOR": "Lincoln Navigator",
+  "ESCALADE": "Cadillac Escalade",
+  "TIBURON": "Hyundai Tiburon",
+  "SENTRA": "Nissan Sentra",
+  "CELICA": "Toyota Celica",
+  "IS300": "Lexus IS 300",
+  "SUPRA": "Toyota Supra",
+  "GOLF": "Volkswagen Golf",
+  "A3": "Audi A3",
+  "RSX": "Acura RSX",
+  "ECLIPSE": "Mitsubishi Eclipse",
+  "TT": "Audi TT",
+  "RX8": "Mazda RX-8",
+  "350Z": "Nissan 350Z",
+  "G35": "Infiniti G35",
+  "3000GT": "Mitsubishi 3000GT",
+  "GTO": "Pontiac GTO",
+  "MUSTANGGT": "Ford Mustang GT",
+  "SKYLINE": "Nissan Skyline",
+  "LANCEREVO8": "Mitsubishi Lancer",
+  "RX7": "Mazda RX-7",
+  "IMPREZAWRX": "Subaru WRX STi",
+};
+
+/** The game's name of a car record, or the record name when it has none. */
+export const carName = (record: string): string => CAR_NAMES[record] ?? record;
