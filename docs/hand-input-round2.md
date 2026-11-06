@@ -86,7 +86,7 @@ No rules for good handling values are in here: the numbers are the owner's. `too
 
 ### Six gears (3000GT, every part level 3, no save)
 
-Editor A = B to 0.03 s: Circuit 3.05 / 7.74 / 347.6 / 507.3 (B 3.02 / 7.72), Drag 3.07 / 7.85 / 333.1 / 506.4 (B 3.07 / 7.87). The game's code
+Editor A is within 0.03 s of B: Circuit 3.05 / 7.74 / 347.6 / 507.3 (B 3.02 / 7.72), Drag 3.07 / 7.85 / 333.1 / 506.4 (B 3.07 / 7.87). The game's code
 gives A 3.05 / 7.75 / 347.6 / 507.3 and 3.07 / 7.85 / 333.1 / 506.4. The gear and final drive keys of the plans, replayed row by row in the
 emulator, end at the planned bytes (both setups, bytes 9..15 equal).
 
@@ -114,9 +114,11 @@ Not changed on purpose: the existing chart, tabs and old scalar controls (author
 
 ## Commits
 
-Editor (fork `ASYMILO/NFSU2-Savegame-Editor`, branch `feat/hand-input`): see `git log feat/hand-input` (round 2 starts after `a1910e3`).
-Tuner repo (`ASYMILO/nfsu2-tuner`): `feat/game-input-rules` (`56ffd9b`), `feat/hand-input-tools-r2`
-(slider emulator reference, `docs/dyno-check-3000gt.md`, `docs/native-memory-map.md`).
+Editor (fork `ASYMILO/NFSU2-Savegame-Editor`, branch `feat/hand-input`, after round 1's `a1910e3`):
+`7c594b1` number-slider key code + emulator fixture, `0e29733` shortest path, planners, nitrous, gears,
+`9c289d2` sliders section, no-save start values, layout, screenshots, this file.
+Tuner repo (`ASYMILO/nfsu2-tuner`): `feat/game-input-rules` (`56ffd9b`); `feat/hand-input-tools-r2`: slider emulator reference
+(`tools/emu/slider_cases.py`, `make_slider_fixture.py`), `docs/dyno-check-3000gt.md`, `docs/native-memory-map.md`.
 
 ## Not verified / skipped
 
