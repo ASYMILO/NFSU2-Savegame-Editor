@@ -23,11 +23,11 @@ export const PREFERENCES: { key: Preference; label: string; text: string }[] = [
  * our choice, not taken from the game; the game has no score for a setup. Power has a tiny weight there (only to break ties).
  */
 export const GOAL_WORDS: Record<string, string> = {
-  circuit: 'quick 0-60 and 0-100 first, then top speed',
+  circuit: 'short 0-60 and 0-100 times, plus some top speed',
   drag: 'the shortest quarter mile',
   drift: 'quick 0-60 and strong pull in the middle revs',
   streetx: 'quick 0-60 and 0-100',
-  url: 'top speed first, then 0-60 and 0-100',
+  url: 'top speed most, plus 0-60 and 0-100',
 };
 
 /** Objective and launch rule of a tab for a preference (`launchMin` is the editor's old "Protect launch" value). */

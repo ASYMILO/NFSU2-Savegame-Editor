@@ -261,7 +261,50 @@ tuning record (`legal-opt.ts` `partsInfo` l.62-74).
 - The new Download on an nfsu2-web backup ZIP (only a raw profile was tried).
 - Phone widths, other browsers.
 
+## 3e. Author's main merged, review and user-test fixes (2026-11-06, branch `feat/tuner-r3e`)
+
+Commits: f23d91c (merge of the author's `origin/main`, 7 commits), then the fixes below on the same branch.
+
+| Point | Now | Evidence |
+|---|---|---|
+| A1 fork behind the author | Author's main merged (career access, `testfile/treav0r`, dyno table 1ec6e03). Conflicts in `index.html`, `editor-controller.ts`, `editor-scope.ts` resolved. | `npm test` below; RX8 0-100: the emulated SPEED2.EXE gives 8.04270 = the author's new table; the old 8.0213 predates PR #4 (tuner repo `tools/emu/emu_cases.py`). |
+| A2 race weights | Shown on each card: "Best here means: … That is our choice; the game has no score for a setup." (`GOAL_WORDS`, `src/model/tuner.ts`) | Weights are the optimizer's own (`legal-opt.ts` l.11-17); no game code scores a setup. |
+| A3 Rear end right did nothing | A slider side opens only when every row has room that way. Rear grip: left only, with "Only to the left: the game lets you only lower it." | `feel.ts` `sides`; test `feel sliders open only the sides…`; grip can only be lowered: tuner repo `docs/setup-bytes.md` l.53. |
+| A4 Grip at high speed moved one axle | Street/Pro: front downforce sits at the top of the shared box, rear does not, so "More" is closed (no one-axle move). Extreme: both ways, both axles. One body part only: the label says "Front/Rear grip at high speed" and that it shifts the balance. | Same test (L1/L2: [-100,0], L3: [-100,100]); box anchor = max of the pair, `setup-bytes.md` l.49-53. |
+| A5 404 on GLOBALB.BUN | Without the file the page says where it is (NFSU2 folder → GLOBAL → GLOBALB.BUN) (`tuning.dyno.localMissing`). Server: see "Run for acceptance". | shot `a0-no-game-file` |
+| A6 ZIP opened "ASYMILO DVD 1" | A ZIP opens the first profile whose file is 54,966 bytes (career); DVD/magazine files are 1,048,612 bytes. A profile with no car: "This profile has no cars. Pick another profile above." | `firstCareerProfile` in `editor-controller.ts`; shots `b1-zip-loaded`, `b4-dvd-profile`. |
+| A7 / A8 in the game | See the tuner repo `docs/game-check-r3e.md`. | |
+| Details vs Reset (C) | The card's list shows only the by-hand keys; the optimizer's sheet (it says "do not reset the Drivetrain") is no longer on the Tuner. | `tuner-controller.ts` `sheet: r.handSheet` |
+| 90 % at "Strong pull" | Text: "The 90 % is our own pick, not a number from the game." | |
+| "by hand minus save" | Table columns "Set by hand / Downloaded save / Gap" with one line on how to read the gap. | |
+| Header | "Tuner and Save Editor"; the author's "Now with full TUNING!" shows with his Save editor only (his test checks the text is in the page). | `save.test.ts` l.53 unchanged |
+| Units | As the game's Dyno Results: "0-60", "0-100" (no unit), top speed km/h, power kW (`powerKw` in `gameNumbers`). | tuner repo `native/runs/dyno_check_20261106/results_A_all.png`; Circuit by hand on the owner's 3000GT = 323.5 kW, game 323.5 kW (`docs/dyno-check-3000gt.md`). |
+| B2 no mode picked | No save: "Pick a car" is picked; a save picks "From my save". | |
+| B3 slow, no progress | Progress bar "n of 5 race types done · s". Results are kept per car, start, race type and goal: going back to a goal is instant (0.3 s). A full run stays 40-57 s (5 workers); not made faster. | `nosave.log`, `withsave.log` |
+| B4 None → red error | Neutral hint: pick the parts, at least ECU, Turbo or Transmission. | |
+| B5 car codes | Names as the game shows them ("Peugeot 206", "Nissan 240SX"): maker from the car record in GLOBALB.BUN + `CAR_NAME_<record>` of LANGUAGES\English.bin (`scripts/car-names.mjs` → `src/data/car-names.ts`). | The game's Customize list starts at "Peugeot 206" (tuner repo `docs/native-menu-map.md` l.40). |
+| B6 A vs B hidden, wide table | A, B and gap on the card. Tables scroll inside their box; at 420 px the page is 420 px wide. | shot `c1-narrow-206` |
+| B7 hard keys | Each line is a tick box: "**Row**: press C (back to default), then RIGHT 7 times. Then it shows 5.11 (now 4.09)." Graph rows "1st time / 2nd time", axis "Bar" and "Revs". | |
+| B8 mph + km/h | One set, as the game (see Units). | |
+| B9 preferences fold up, Suspension "Leave as is" | The box is a button with its own state; on a goal change the cards stay until the new ones are ready. Ride moved: Suspension shows "To do" with 4 lines. | `nosave.log` ("prefs still open: true", Suspension lines) |
+| B10 unsure descriptions | One line "Not sure? Leave them in the middle" and per slider "when to move it" (general car handling; the code basis stays below it). | |
+| Words | Optimize → "Find best setup"; Reset (key C) → "C (back to default)"; Change / Leave as is / Locked → "To do" / "Nothing to do" / "Needs a part"; bhp → kW; mode A/B → "Set by hand" / "Downloaded save"; GLOBALB.BUN → "the game file"; LEGAL RESULT sheet removed from the Tuner. | |
+
+### Checks (3e)
+- `NFSU2_GLOBALB=<abs>/data/game/GLOBALB.BUN npm test`: **146 tests, 146 pass, 0 fail, 0 skipped** (with `testfile/treav0r` from the author's main).
+  `src/test/save.test.ts` unchanged: 70 tests, all pass with the game file.
+- Browser, scripts, logs and shots in tuner repo `native/runs/r3e_ui/` (gitignored) (headless Brave, files answered by Playwright routing from `dist/` and the tuner repo's `data/game/`):
+  tuner repo `native/runs/r3e_ui/nosave.cjs` (no save: 3000GT, Pro ECU/Turbo, Extreme transmission, Street suspension/brakes),
+  `withsave.cjs` (nfsu2.xyz-style ZIP built from a copy of `data/save/`: opens "ASYMILO (10 slots)", cars "Peugeot 106",
+  "Mitsubishi 3000GT"; download changes only the ASYMILO profile (93 bytes: setups of slot 2 and checksums) and its
+  GARAGE.DAT pairing bytes 0x8-0xf), `narrow.cjs` (420 px). No page errors. The owner's profile is unchanged (sha1 6bedc6ad…).
+
+### Not checked (3e)
+- Feel of the sliders in the game (as 3d).
+- Other browsers, phones (only 420 px width in Brave).
+
 ## 7. Undo
 
+Round 3e only: `git checkout feat/tuner-r3c && npm run build` in `port-editor` (branch `feat/tuner-r3e` stays for later).
 Round 3d only: `git checkout 4582180 && npm run build`. Round 3c only: `git checkout feat/tuner-r3 && npm run build` in `port-editor`. All of round 3: `git checkout feat/hand-input && npm run build` in `port-editor` (the author's screen and round 2 come back as before), or delete the
 branch: `git branch -D feat/tuner-r3` and `git push fork --delete feat/tuner-r3`.
