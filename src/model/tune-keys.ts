@@ -284,6 +284,15 @@ export class CurveScreen {
     }
   }
 
+  /** An independent copy (for searches). */
+  clone(): CurveScreen {
+    const c: CurveScreen = Object.create(CurveScreen.prototype);
+    Object.assign(c, this, {
+      bytes: this.bytes.slice(), total: this.total.slice(), turbo: this.turbo.slice(), setup: this.setup.slice(),
+    });
+    return c;
+  }
+
   /** Key C: the nine bytes go to 100 and the car is rebuilt. */
   reset(): void {
     this.bytes.fill(100);

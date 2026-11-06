@@ -676,7 +676,7 @@ export function formatSheet(
     L.push(`  reachable: ${lg.reachable}; overall legal: ${lg.legal ? 'yes' : 'NO'}`);
     if (v.launch) L.push(`  launch points (% of stock)         : ${v.launch.points.map((p) => `${p.rpm}rpm ${p.pctOfStock}%`).join(', ')}`);
     const eo = v.entryOrder;
-    L.push('ENTRY ORDER (cheat limits OFF). Step 0: press "Reset to default" on the ECU screen, the Turbo screen and the Drivetrain screen. Then, in this order, set the bar of that column to the value:');
+    L.push('ENTRY ORDER (cheat limits OFF). Step 0: press "Reset to default" on the ECU screen and the Turbo screen. Do not reset the Drivetrain: its slider moves 3 bytes a press, so from the reset value some final drives cannot be reached (mode A plans it from your saved value). Then, in this order, set the bar of that column to the value:');
     let n = 0;
     for (const [lab, list] of [['ECU', eo.ecu], ['Turbo', eo.turbo]] as [string, { index: number; nm: number }[]][]) {
       const rows = lab === 'ECU' ? v.ecu : v.turbo;

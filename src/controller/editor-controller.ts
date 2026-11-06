@@ -21,9 +21,11 @@ import {
   type CurveKind, type CurvePoint, type DynoEvent, type DynoResult, type GameData, type Gearing, type ScalarRow, type TuningBand,
 } from '../model/dyno.js';
 import type {
-  CategoryView, CurveChart, DynoCell, DynoRow, DynoTab, EditorScope, GearChart, PartView, SlotView, Status, TuningTab, UniquePartView, VisualRow,
+  CategoryView, CurveChart, DynoCell, DynoRow, DynoTab, EditorScope, GearChart, HandRow, PartView, SlotView, Status, TuningTab, UniquePartView, VisualRow,
 } from './editor-scope.js';
 import { formatSheet, OBJECTIVES, OBJ_BY_SETUP, runLegal } from '../model/legal-opt.js';
+import { formatHandPlan, planHandInput, type HandInputPlan } from '../model/hand-input.js';
+import { buildVirtualSave, installedForLevels, PART_LEVEL_CATEGORIES } from '../model/virtual-save.js';
 
 const partsByIndex = new Map<number, PerfPart>(PERF_PARTS.map((p) => [p.index, p]));
 const tuningPerfIndexSet = new Set(TUNING_PERF_INDICES);
@@ -94,8 +96,12 @@ export function EditorController($scope: EditorScope): void {
       curveTabs: [], curve: 'ecu', cheat: false, point: 0, chart: null, gear: 0, drive: null, scalars: [],
       legalObjective: '', legalLaunch: false, legalSheet: '', legalCopied: false,
       legalChoices: [{ key: '', name: 'Same as setup tab' }, ...OBJ_BY_SETUP.map((key) => ({ key, name: OBJECTIVES[key].name }))],
+      mode: 'hand', handSheet: '', handTable: [], handPresses: 0,
     },
   };
+  $scope.virtual = { on: false, cars: [], carHash: 0, levels: [] };
+  /** Last Optimize: mode B's optimum and mode A's plan for one slot and setup. */
+  let handResult: { key: string; optimum: Uint8Array; plan: HandInputPlan } | null = null;
 
   fetch('./car-donors.json')
     .then((res) => {
@@ -231,6 +237,12 @@ export function EditorController($scope: EditorScope): void {
     if (!view.groups.length) view.blocked = 'No compatible parts in this game database for this car and menu.';
   }
 
+  function clearSheets(): void {
+    const view = $scope.tuning.dyno;
+    view.legalSheet = ''; view.handSheet = ''; view.handTable = []; view.handPresses = 0;
+    handResult = null;
+  }
+
   /** Builds the dyno model of the open tuning slot, or explains why there is none. */
   function dynoModel(): { model: DynoModel; setups: Uint8Array[] } | { reason: string } {
     if (!data) return { reason: 'Load a save first.' };
@@ -348,7 +360,10 @@ export function EditorController($scope: EditorScope): void {
       }
     } else if (view.curve === 'ecu' || view.curve === 'turbo') {
       const points = curves[view.curve];
-      view.chart = points ? curveChart(points, view.point) : null;
+      // Mode A: the presses under the bars, while the draft is still the plan's result.
+      const plan = view.mode === 'hand' && handResult && handResult.key === draftKey() && sameBytes(bytes, handResult.plan.setup)
+        ? handResult.plan.plans.find((p) => p.id === view.curve) : undefined;
+      view.chart = points ? curveChart(points, view.point, plan?.passes) : null;
     } else view.scalars = scalars.filter((row) => row.category === view.curve);
   }
 
@@ -358,6 +373,7 @@ export function EditorController($scope: EditorScope): void {
   }
 
   function resetEditor(): void {
+    handResult = null;
     drafts.clear();
     visualDraft = null;
     $scope.tuning.open = false;
@@ -441,6 +457,7 @@ export function EditorController($scope: EditorScope): void {
     reader.onload = () => {
       $scope.$apply(() => {
         const bytes = new Uint8Array(reader.result as ArrayBuffer);
+        $scope.virtual.on = false;
         $scope.fileName = file.name;
         $scope.fileSize = bytes.length;
         if (isZip(bytes)) {
@@ -478,7 +495,8 @@ export function EditorController($scope: EditorScope): void {
           rejectFile(check.error ?? 'Not a valid save file.');
           return;
         }
-        if (backup || $scope.tuning.slot >= slotCount(bytes)) resetEditor();
+        if (backup || $scope.virtual.on || $scope.tuning.slot >= slotCount(bytes)) resetEditor();
+        $scope.virtual.on = false;
         backup = null;
         $scope.backup = null;
         showLoaded(bytes);
@@ -520,7 +538,7 @@ export function EditorController($scope: EditorScope): void {
     $scope.tuning.tab = 'PERF';
     $scope.tuning.sub = TUNING_PERF_CATEGORIES[0].code;
     $scope.tuning.dyno.point = 0;
-    $scope.tuning.dyno.legalSheet = '';
+    clearSheets();
     drafts.clear();
     visualDraft = null;
     rebuildTuning();
@@ -659,33 +677,96 @@ export function EditorController($scope: EditorScope): void {
     }
   }
 
+  /** Parses GLOBALB.BUN bytes and refreshes everything that depends on them. */
+  function applyGameData(bytes: Uint8Array, name: string): void {
+    try {
+      const nextGame = parseGameData(bytes);
+      const nextVisuals = parseVisualData(bytes, nextGame.cars);
+      game = nextGame;
+      visuals = nextVisuals;
+      $scope.tuning.dyno.gameName = name;
+      $scope.tuning.dyno.gameError = '';
+    } catch (err) {
+      game = null;
+      visuals = null;
+      $scope.tuning.dyno.gameName = '';
+      $scope.tuning.dyno.gameError = errorMessage(err);
+    }
+    drafts.clear();
+    visualDraft = null;
+    handResult = null;
+    refreshVirtual();
+    if ($scope.virtual.on) rebuildVirtualSave();
+    rebuildDyno();
+    rebuildVisual();
+  }
+
   $scope.loadGameData = function (file: File | null): void {
     if (!file) return;
     const reader = new FileReader();
     reader.onload = () => {
-      $scope.$apply(() => {
-        try {
-          const bytes = new Uint8Array(reader.result as ArrayBuffer);
-          const nextGame = parseGameData(bytes);
-          const nextVisuals = parseVisualData(bytes, nextGame.cars);
-          game = nextGame;
-          visuals = nextVisuals;
-          $scope.tuning.dyno.gameName = file.name;
-          $scope.tuning.dyno.gameError = '';
-        } catch (err) {
-          game = null;
-          visuals = null;
-          $scope.tuning.dyno.gameName = '';
-          $scope.tuning.dyno.gameError = errorMessage(err);
-        }
-        drafts.clear();
-        visualDraft = null;
-        rebuildDyno();
-        rebuildVisual();
-      });
+      $scope.$apply(() => applyGameData(new Uint8Array(reader.result as ArrayBuffer), file.name));
     };
     reader.onerror = () => $scope.$apply(() => { $scope.tuning.dyno.gameError = 'Could not read the file.'; });
     reader.readAsArrayBuffer(file);
+  };
+
+  // The local server (serve_editors.sh) offers the owner's own copy at ./game/GLOBALB.BUN; a published site does not, and
+  // the file picker stays the way in. Nothing of the game is stored in this repository.
+  fetch('./game/GLOBALB.BUN')
+    .then((res) => (res.ok && typeof res.arrayBuffer === 'function' ? res.arrayBuffer() : Promise.reject(new Error('no local copy'))))
+    .then((buf) => {
+      $scope.$evalAsync(() => { if (!game) applyGameData(new Uint8Array(buf), 'GLOBALB.BUN (local copy)'); });
+    })
+    .catch(() => { /* no local copy: the user picks the file */ });
+
+  // ---- without a save ----------------------------------------------------------------------------
+
+  /** Cars and part lists for "without a save", from the loaded game data. */
+  function refreshVirtual(): void {
+    const v = $scope.virtual;
+    v.cars = game ? game.cars.filter((c) => !TRAFFIC_CARS.some((t) => t.hash === c.hash)).map((c) => ({ hash: c.hash, name: c.name })) : [];
+    if (!v.cars.some((c) => c.hash === v.carHash)) v.carHash = v.cars[0]?.hash ?? 0;
+    if (!v.levels.length) {
+      v.levels = PART_LEVEL_CATEGORIES.map((c) => ({
+        code: c.code, label: c.label, value: 0,
+        options: [{ value: 0, label: 'None' }, ...[1, 2, 3].filter((l) => l <= c.maxLevel).map((l) => ({ value: l, label: ['Street', 'Pro', 'Extreme'][l - 1] }))],
+      }));
+    }
+  }
+
+  /** The in-memory save follows the car and the part levels of the lists. */
+  function rebuildVirtualSave(): void {
+    const v = $scope.virtual;
+    if (!v.carHash) return;
+    const levels = Object.fromEntries(v.levels.map((l) => [l.code, l.value]));
+    applyResult(buildVirtualSave(v.carHash, installedForLevels(levels)));
+  }
+
+  $scope.startNoSave = function (): void {
+    refreshVirtual();
+    if (!game || !$scope.virtual.cars.length) {
+      setStatus('error', 'Load GLOBAL\\GLOBALB.BUN first: the car list comes from it.');
+      return;
+    }
+    backup = null;
+    $scope.backup = null;
+    resetEditor();
+    $scope.virtual.on = true;
+    $scope.fileName = '';
+    showLoaded(buildVirtualSave($scope.virtual.carHash, installedForLevels({})), 'No save: a virtual car.');
+    setStatus('success', 'No save loaded. Pick the car and its parts in the DYNO tab. Nothing here can be downloaded as a save.');
+    $scope.openVirtualTuning();
+  };
+
+  $scope.openVirtualTuning = function (): void {
+    $scope.openTuning(0);
+    $scope.selectTab('DYNO');
+  };
+
+  $scope.changeVirtual = function (): void {
+    if (!$scope.virtual.on) return;
+    rebuildVirtualSave();
   };
 
   $scope.editVisual = function (row: VisualRow): void {
@@ -736,7 +817,7 @@ export function EditorController($scope: EditorScope): void {
 
   $scope.selectSetup = function (setup: DynoEvent): void {
     $scope.tuning.dyno.setup = setup;
-    $scope.tuning.dyno.legalSheet = '';
+    clearSheets();
     rebuildDyno();
   };
 
@@ -781,10 +862,17 @@ export function EditorController($scope: EditorScope): void {
           const res = runLegal(built.model, view.carName, start, view.setup, { objective, launchMin });
           if (draftKey() === key) {
             const chosen = res.launch ?? res.plain;
-            const bytes = Uint8Array.from(chosen.setupBytes);
-            drafts.set(key, { bytes, band: built.model.tuningBand(bytes, view.setup) });
+            const optimum = Uint8Array.from(chosen.setupBytes);
+            // Mode A: what the game's keys can reach from the saved setup (the Drivetrain keeps your value: no Reset there).
+            const plan = planHandInput(built.model, start, optimum, view.setup, objective);
+            handResult = { key, optimum, plan };
             const title = `${view.carName}, ${SETUP_NAMES[view.setup]} setup, event ${OBJECTIVES[res.objective].name}`;
             view.legalSheet = formatSheet(title, res);
+            view.handSheet = formatHandPlan(plan, view.setup);
+            view.handTable = handTable(plan);
+            view.handPresses = plan.presses;
+            const bytes = view.mode === 'hand' ? plan.setup : optimum;
+            drafts.set(key, { bytes, band: built.model.tuningBand(bytes, view.setup) });
             if (sameBytes(bytes, start)) setStatus('success', 'Optimize found no better setup.');
           }
         } catch (err) {
@@ -796,9 +884,33 @@ export function EditorController($scope: EditorScope): void {
     }, 30);
   };
 
+  /** The A against B table in the dyno screen's formats. */
+  function handTable(plan: HandInputPlan): HandRow[] {
+    const sec = (v: number | null): string => (v === null ? '-' : `${v.toFixed(2)} s`);
+    const d = (v: number | null, unit: string, digits = 2): string => (v === null ? '-' : `${v > 0 ? '+' : ''}${v.toFixed(digits)} ${unit}`);
+    return [
+      { label: '0–60 mph', a: sec(plan.a.t60), b: sec(plan.b.t60), diff: d(plan.diff.t60, 's') },
+      { label: '0–100 mph', a: sec(plan.a.t100), b: sec(plan.b.t100), diff: d(plan.diff.t100, 's') },
+      { label: 'Top speed', a: `${plan.a.topKmh.toFixed(1)} km/h`, b: `${plan.b.topKmh.toFixed(1)} km/h`, diff: d(plan.diff.topKmh, 'km/h', 1) },
+      { label: 'Power', a: `${plan.a.powerBhp.toFixed(1)} bhp`, b: `${plan.b.powerBhp.toFixed(1)} bhp`, diff: d(plan.diff.powerBhp, 'bhp', 1) },
+    ];
+  }
+
+  /** Mode A (by hand with the keys) or mode B (exact, written to the save): swaps the draft between the two results. */
+  $scope.setMode = function (mode: 'hand' | 'save'): void {
+    const view = $scope.tuning.dyno;
+    view.mode = mode;
+    const built = dynoModel();
+    if (!handResult || 'reason' in built || handResult.key !== draftKey()) { rebuildDyno(); return; }
+    const bytes = mode === 'hand' ? handResult.plan.setup : handResult.optimum;
+    if (sameBytes(bytes, built.setups[view.setup])) drafts.delete(draftKey());
+    else drafts.set(draftKey(), { bytes, band: built.model.tuningBand(bytes, view.setup) });
+    rebuildDyno();
+  };
+
   $scope.copyLegalSheet = function (): void {
     const view = $scope.tuning.dyno;
-    const text = view.legalSheet;
+    const text = view.mode === 'hand' && view.handSheet ? view.handSheet : view.legalSheet;
     if (!text) return;
     const markCopied = (): void => {
       setTimeout(() => {
@@ -847,12 +959,12 @@ export function EditorController($scope: EditorScope): void {
     drafts.delete(key);
     applyResult(setSetupTuning(data, slot, setup, bytes, gearing, scalars), true);
     setStatus('success', `Slot ${slot + 1}: ${SETUP_NAMES[setup]} ${parts || 'setup'} saved. Download to keep the changes.`);
-    $scope.tuning.dyno.legalSheet = '';
+    clearSheets();
   };
 
   $scope.discardDyno = function (): void {
     drafts.delete(draftKey());
-    $scope.tuning.dyno.legalSheet = '';
+    clearSheets();
     rebuildDyno();
   };
 
@@ -1012,8 +1124,8 @@ function sameBytes(a: Uint8Array, b: Uint8Array): boolean {
  * @param points Curve points in N·m.
  * @param selected Selected column.
  */
-export function curveChart(points: CurvePoint[], selected: number): CurveChart {
-  const width = 560, height = 270, left = 44, right = 8, top = 10, bottom = 236;
+export function curveChart(points: CurvePoint[], selected: number, passes: number[][] = []): CurveChart {
+  const width = 560, height = 270 + (passes.length ? 14 * passes.length + 6 : 0), left = 44, right = 8, top = 10, bottom = 236;
   const highest = Math.max(...points.flatMap((p) => [p.max, p.value, p.effective, p.stock]), 1);
   const step = [10, 20, 25, 50, 100, 200, 250, 500].find((s) => highest / s <= 6) ?? 1000;
   const yMax = Math.ceil(highest / step) * step;
@@ -1028,6 +1140,7 @@ export function curveChart(points: CurvePoint[], selected: number): CurveChart {
       stockY: y(Math.min(Math.max(p.stock, p.min), p.max)),
       valueY, valueH: bottom - valueY, effY: y(p.effective),
       rpmLabel: `${(p.rpm / 1000).toFixed(1)}k`,
+      presses: passes.map((row) => (row[index] ? `${row[index] > 0 ? '▲' : '▼'}${Math.abs(row[index])}` : '·')),
     };
   });
   const ticks = Array.from({ length: Math.round(yMax / step) + 1 }, (_, i) => ({ y: y(i * step), label: num(i * step) }));
@@ -1037,6 +1150,7 @@ export function curveChart(points: CurvePoint[], selected: number): CurveChart {
   const shifted = Math.round(p.effective) !== Math.round(p.value);
   return {
     width, height, left, top, bottom, yMax, ticks, columns,
+    passLabels: passes.map((_, k) => (k === 0 ? 'C, then' : `again ${k + 1}`)),
     selected: {
       rpm: `${num(p.rpm)} rpm`, value: `${num(p.value)} N·m`, stock: `${num(stock)} N·m`,
       range: `${num(p.min)}–${num(p.max)} N·m`,

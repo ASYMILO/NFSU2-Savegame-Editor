@@ -86,10 +86,14 @@ export interface CurveColumn {
   /** Value after the load's sum restore; differs from valueY only for independently set points. */
   effY: number;
   rpmLabel: string;
+  /** Mode A: key presses under the bar, one entry per pass (+n UP, -n DOWN, empty = none). */
+  presses: string[];
 }
 
 /** ECU or turbo graph in the dyno tab. */
 export interface CurveChart {
+  /** Mode A: names of the pass rows under the bars; empty without a plan. */
+  passLabels: string[];
   width: number;
   height: number;
   /** Plot area. */
@@ -170,6 +174,24 @@ export interface DynoView {
   legalSheet: string;
   legalCopied: boolean;
   legalChoices: { key: string; name: string }[];
+  /** `hand`: mode A, set by hand in the game with the keys (default). `save`: mode B, exact optimum written to the save. */
+  mode: 'hand' | 'save';
+  /** Mode A sheet (what to press). */
+  handSheet: string;
+  /** Mode A against mode B on the dyno screen's numbers; empty before Optimize. */
+  handTable: HandRow[];
+  handPresses: number;
+}
+
+/** One line of the A against B table. */
+export interface HandRow { label: string; a: string; b: string; diff: string }
+
+/** "Without a save": car and part levels picked from lists. */
+export interface VirtualView {
+  on: boolean;
+  cars: { hash: number; name: string }[];
+  carHash: number;
+  levels: { code: string; label: string; value: number; options: { value: number; label: string }[] }[];
 }
 
 /** Top-level tuning tab. */
@@ -251,6 +273,12 @@ export interface EditorScope extends angular.IScope {
   swapSlots(slot: number): void;
   replaceCar(slot: number): void;
   loadGameData(file: File | null): void;
+  /** Without a save: pick a car and part levels from lists (needs the game data). */
+  virtual: VirtualView;
+  startNoSave(): void;
+  changeVirtual(): void;
+  openVirtualTuning(): void;
+  setMode(mode: 'hand' | 'save'): void;
   editVisual(row: VisualRow): void;
   applyVisual(): void;
   discardVisual(): void;

@@ -41,7 +41,21 @@
       <p class="message" ng-class="status.type" ng-if="status.text" role="status">{{ status.text }}</p>
     </section>
 
-    <section class="profile-section" ng-if="loaded">
+    <section class="profile-section">
+      <h3>No save? Tune a car anyway</h3>
+      <p class="muted">Pick a car and its part levels from lists and use the same DYNO tab. Nothing is read from or written to a save. Needs <code>GLOBAL\GLOBALB.BUN</code>: it is loaded for you when this page is served by <code>serve_editors.sh</code> on the computer that has the file.</p>
+      <div class="editor-row">
+        <label class="profile-action-btn dyno-file" ng-if="!tuning.dyno.gameName">
+          Load game data
+          <input type="file" accept=".bun,.BUN" nfsu-file-change="loadGameData">
+        </label>
+        <span class="muted" ng-if="tuning.dyno.gameName">{{ tuning.dyno.gameName }} loaded</span>
+        <button type="button" class="profile-action-btn" ng-click="startNoSave()" ng-disabled="!tuning.dyno.gameName">Tune without a save</button>
+        <button type="button" class="profile-action-btn" ng-if="virtual.on" ng-click="openVirtualTuning()">Open tuning</button>
+      </div>
+    </section>
+
+    <section class="profile-section" ng-if="loaded && !virtual.on">
       <h3>Profile</h3>
       <form class="bike-dialog-form profile-form" ng-submit="applyProfile()">
         <label>
@@ -59,7 +73,7 @@
       </form>
     </section>
 
-    <section class="profile-section" ng-if="loaded">
+    <section class="profile-section" ng-if="loaded && !virtual.on">
       <h3>Car slots</h3>
       <p class="muted">{{ usedCount() }} of {{ slots.length }} slots filled. Open slots are unlocked and free for a sponsor car.</p>
       <div class="bike-list">
@@ -101,7 +115,7 @@
       </div>
     </section>
 
-    <section class="profile-section download-section" ng-if="loaded">
+    <section class="profile-section download-section" ng-if="loaded && !virtual.on">
       <div>
         <h3>Ready to hit the streets?</h3>
         <p class="muted">{{ backup ? 'Download the backup ZIP with recalculated save checksums and matching GARAGE.DAT fingerprints.' : 'Download a new file with recalculated checksums.' }} Keep your original backup.</p>
@@ -225,6 +239,15 @@
         </div>
       </div>
       <div class="dyno-panel" ng-if="tuning.tab === 'DYNO'">
+        <section class="dyno-virtual" ng-if="virtual.on">
+          <label>Car
+            <select ng-model="virtual.carHash" ng-options="c.hash as c.name for c in virtual.cars" ng-change="changeVirtual()"></select>
+          </label>
+          <label ng-repeat="level in virtual.levels track by level.code">{{ level.label }}
+            <select ng-model="level.value" ng-options="o.value as o.label for o in level.options" ng-change="changeVirtual()"></select>
+          </label>
+          <p class="muted">No save: every setup starts at the game's defaults. Changing the car or a part level starts again.</p>
+        </section>
         <p class="muted" ng-if="tuning.dyno.blocked">{{ tuning.dyno.blocked }}</p>
         <div ng-if="tuning.dyno.rows.length">
           <div class="dyno-setups" role="tablist" aria-label="Dyno setups">
@@ -250,13 +273,35 @@
               <input type="checkbox" ng-model="tuning.dyno.legalLaunch" ng-disabled="tuning.dyno.busy">
               Protect launch
             </label>
+            <span class="dyno-mode" role="radiogroup" aria-label="How do you enter the result?">
+              <label><input type="radio" name="dynomode" value="hand" ng-model="tuning.dyno.mode" ng-change="setMode('hand')" ng-disabled="tuning.dyno.busy"> A. By hand in the game (keys)</label>
+              <label><input type="radio" name="dynomode" value="save" ng-model="tuning.dyno.mode" ng-change="setMode('save')" ng-disabled="tuning.dyno.busy"> B. Write to the save (exact)</label>
+            </span>
             <button type="button" class="profile-action-btn" ng-click="optimizeLegal()" ng-disabled="tuning.dyno.busy">
               {{ tuning.dyno.busy ? 'Optimizing…' : 'Optimize (game rules)' }}
             </button>
           </div>
-          <div ng-if="tuning.dyno.legalSheet">
-            <strong>Game-rule setup (enter these in the game)</strong>
-            <p class="muted">Reset to default on the ECU, Turbo and Drivetrain screens first, then follow the numbered steps. Values are N*m bar heights as on the graph; the game moves neighbours each time, so after each step fix the column that is furthest from its value.</p>
+          <div ng-if="tuning.dyno.handTable.length">
+            <strong>By hand (A) against exact (B)</strong>
+            <table class="dyno-table dyno-ab">
+              <thead><tr><th></th><th>A. By hand</th><th>B. Exact</th><th>A minus B</th></tr></thead>
+              <tbody>
+                <tr ng-repeat="row in tuning.dyno.handTable track by row.label">
+                  <th scope="row">{{ row.label }}</th><td>{{ row.a }}</td><td>{{ row.b }}</td><td>{{ row.diff }}</td>
+                </tr>
+              </tbody>
+            </table>
+            <p class="muted" ng-if="tuning.dyno.mode === 'hand'">A is what the game's UP and DOWN keys reach: {{ tuning.dyno.handPresses }} key presses in all. The graph shows them under the bars: press C on the screen, then go through the bars from left to right. The draft below is A, so Apply stores the same bytes the game would hold.</p>
+            <p class="muted" ng-if="tuning.dyno.mode === 'save'">B is the exact optimum. Apply writes its bytes to the save; the game takes them as they are.</p>
+          </div>
+          <div ng-if="tuning.dyno.mode === 'hand' && tuning.dyno.handSheet">
+            <strong>Keys to press in the game</strong>
+            <pre class="dyno-sheet">{{ tuning.dyno.handSheet }}</pre>
+            <button type="button" class="profile-action-btn" ng-click="copyLegalSheet()">{{ tuning.dyno.legalCopied ? 'Copied' : 'Copy sheet' }}</button>
+          </div>
+          <div ng-if="tuning.dyno.mode === 'save' && tuning.dyno.legalSheet">
+            <strong>Exact setup (B)</strong>
+            <p class="muted">Apply writes these bytes to the save. The sheet shows how the same bars could be set by value on the game's graph (Reset to default on ECU and Turbo first, then the numbered steps; the game moves neighbours each time, so after each step fix the column that is furthest from its value).</p>
             <pre class="dyno-sheet">{{ tuning.dyno.legalSheet }}</pre>
             <button type="button" class="profile-action-btn" ng-click="copyLegalSheet()">{{ tuning.dyno.legalCopied ? 'Copied' : 'Copy sheet' }}</button>
           </div>
@@ -361,7 +406,11 @@
                       ng-attr-y1="{{ col.effY }}" ng-attr-y2="{{ col.effY }}"></line>
                 <text class="dyno-axis" ng-attr-x="{{ col.x + col.width / 2 }}" ng-attr-y="{{ tuning.dyno.chart.bottom + 16 }}"
                       text-anchor="middle">{{ col.rpmLabel }}</text>
+                <text class="dyno-press" ng-repeat="press in col.presses track by $index" ng-attr-x="{{ col.x + col.width / 2 }}"
+                      ng-attr-y="{{ tuning.dyno.chart.bottom + 32 + $index * 14 }}" text-anchor="middle">{{ press }}</text>
               </g>
+              <text class="dyno-axis" ng-repeat="label in tuning.dyno.chart.passLabels track by $index" x="2"
+                    ng-attr-y="{{ tuning.dyno.chart.bottom + 32 + $index * 14 }}">{{ label }}</text>
               <text class="dyno-axis" ng-attr-x="{{ tuning.dyno.chart.width - 8 }}" ng-attr-y="{{ tuning.dyno.chart.height - 4 }}"
                     text-anchor="end">RPM</text>
             </svg>

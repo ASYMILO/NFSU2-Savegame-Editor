@@ -433,3 +433,12 @@ body {
   .visual-color-grid { grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; }
   .visual-color { min-height: 44px; font-size: 13px; }
 }
+
+/* Without a save, mode A / B, and the key presses under the bars. */
+.dyno-virtual { display: flex; flex-wrap: wrap; align-items: end; gap: 10px 14px; padding: 8px 0 4px; border-bottom: 1px solid var(--color-border); }
+.dyno-virtual label { display: flex; flex-direction: column; gap: 3px; font-size: 12px; color: var(--color-text-muted); }
+.dyno-virtual select { min-width: 130px; }
+.dyno-virtual p { flex-basis: 100%; margin: 0; }
+.dyno-mode { display: inline-flex; flex-wrap: wrap; gap: 12px; padding: 4px 10px; border: 1px solid var(--color-border); }
+.dyno-press { fill: var(--color-text-strong); font-size: 12px; font-weight: 600; font-family: inherit; }
+.dyno-ab td, .dyno-ab th { white-space: nowrap; }
