@@ -101,3 +101,15 @@ test('gear moves never open a shift hole below the reset-to-default retention fl
   const res = optimize(model, start, 'circuit', { nRandom: 0, maxIter: 40 });
   assert.ok(worstRetention(model, res.bytes) >= floor - 1e-6, 'optimized gearbox keeps the floor');
 });
+
+test('cached curves equal a fresh model, also after other setups were built', { skip: SKIP }, () => {
+  const game = parseGameData(new Uint8Array(readFileSync(GAME_BUN)));
+  const c = exact.cases[refs[0].caseIndex];
+  const used = open(game, c).model;
+  const a = Uint8Array.from(c.setup), b = defaultSetup(a);
+  for (const kind of ['ecu', 'turbo'] as CurveKind[]) {
+    used.curve(a, kind); used.tuned(b); used.curve(b, kind);
+    assert.deepEqual(used.curve(a, kind), open(game, c).model.curve(a, kind), `${kind}: cached = fresh`);
+    assert.deepEqual(neighbours(used, a), neighbours(open(game, c).model, a), `${kind}: moves cached = fresh`);
+  }
+});

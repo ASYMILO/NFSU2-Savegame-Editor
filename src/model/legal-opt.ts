@@ -207,8 +207,21 @@ export function curveLegality(model: DynoModel, setup: Uint8Array, kind: CurveKi
 
 export interface Move { desc: { kind: string; i?: number; j?: number; d?: number; param?: number; ratio?: number }; bytes: Uint8Array }
 
+// The moves depend only on the model and the bytes, and the climbs (5 starts, plain + launch) walk through the same
+// setups again and again; building them is ~80 % of a search. Callers must not change the returned arrays.
+const moveCache = new WeakMap<DynoModel, Map<string, Move[]>>();
+
 /** Candidate moves from a setup: pairwise transfers (+d at i, -d at j, realised by game edits) and gear moves. */
 export function neighbours(model: DynoModel, s: Uint8Array): Move[] {
+  let cache = moveCache.get(model);
+  if (!cache) moveCache.set(model, cache = new Map());
+  const key = keyOf(s);
+  let moves = cache.get(key);
+  if (!moves) cache.set(key, moves = buildNeighbours(model, s));
+  return moves;
+}
+
+function buildNeighbours(model: DynoModel, s: Uint8Array): Move[] {
   const out: Move[] = [];
   const seen = new Set([keyOf(s)]);
   const push = (desc: Move['desc'], bytes: Uint8Array): void => {

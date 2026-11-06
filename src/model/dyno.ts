@@ -63,6 +63,8 @@ const CURVE_WEIGHTS = [0.25, 0.25, -0.25, -0.25, -0.25, -0.25, -0.25, -0.25, 4.2
 const REDISTRIBUTE_STEPS = 20;
 /** Threshold 0x7A0354 (≈1e-7 in game units), in N·m. */
 const CURVE_EPSILON = 1e-4;
+/** Entries {@link DynoModel.curve} keeps (about 75,000 distinct setups per optimizer tab, ~1 kB each). */
+const CURVE_CACHE_MAX = 100_000;
 const P_ECU = 23;
 const P_TURBO = 24;
 
@@ -419,6 +421,7 @@ export class DynoModel {
   private defs = new Map<number, number>();
   private curveDefs = new Map<number, number[]>();
   private curvePeak = new Map<number, number>();
+  private readonly curveCache = new Map<string, CurvePoint[] | null>();
   /**
    * @param game Parsed game data.
    * @param car Car record.
@@ -938,6 +941,18 @@ export class DynoModel {
    * @returns Nine points, or null when the installed parts do not unlock the curve.
    */
   curve(setup: ArrayLike<number>, kind: CurveKind): CurvePoint[] | null {
+    // The optimizer asks for the same curve about 3 times per setup; the answer depends only on the bytes. Callers must
+    // not change the returned points. shortcut: the cache is cleared whole at CURVE_CACHE_MAX entries, fine for one search.
+    const key = kind + String.fromCharCode(...Array.from(setup));
+    const hit = this.curveCache.get(key);
+    if (hit !== undefined) return hit;
+    if (this.curveCache.size >= CURVE_CACHE_MAX) this.curveCache.clear();
+    const points = this.buildCurve(setup, kind);
+    this.curveCache.set(key, points);
+    return points;
+  }
+
+  private buildCurve(setup: ArrayLike<number>, kind: CurveKind): CurvePoint[] | null {
     const param = kind === 'ecu' ? P_ECU : P_TURBO, off = kind === 'ecu' ? ECU_OFF : TURBO_OFF;
     const p = this.tuned(setup);
     if (!this.active(p, param)) return null;

@@ -280,7 +280,7 @@ Commits: f23d91c (merge of the author's `origin/main`, 7 commits), then the fixe
 | Header | "Tuner and Save Editor"; the author's "Now with full TUNING!" shows with his Save editor only (his test checks the text is in the page). | `save.test.ts` l.53 unchanged |
 | Units | As the game's Dyno Results: "0-60", "0-100" (no unit), top speed km/h, power kW (`powerKw` in `gameNumbers`). | tuner repo `native/runs/dyno_check_20261106/results_A_all.png`; Circuit by hand on the owner's 3000GT = 323.5 kW, game 323.5 kW (`docs/dyno-check-3000gt.md`). |
 | B2 no mode picked | No save: "Pick a car" is picked; a save picks "From my save". | |
-| B3 slow, no progress | Progress bar "n of 5 race types done · s". Results are kept per car, start, race type and goal: going back to a goal is instant (0.3 s). A full run stays 40-57 s (5 workers); not made faster. | `nosave.log`, `withsave.log` |
+| B3 slow, no progress | Progress bar "n of 5 race types done · s". Results are kept per car, start, race type and goal: going back to a goal is instant (0.3 s). A full run: 40.7 s before, 21.5 s after the caches below (same browser walk with the save, same page numbers). | `nosave.log`, `withsave.log` |
 | B4 None → red error | Neutral hint: pick the parts, at least ECU, Turbo or Transmission. | |
 | B5 car codes | Names as the game shows them ("Peugeot 206", "Nissan 240SX"): maker from the car record in GLOBALB.BUN + `CAR_NAME_<record>` of LANGUAGES\English.bin (`scripts/car-names.mjs` → `src/data/car-names.ts`). | The game's Customize list starts at "Peugeot 206" (tuner repo `docs/native-menu-map.md` l.40). |
 | B6 A vs B hidden, wide table | A, B and gap on the card. Tables scroll inside their box; at 420 px the page is 420 px wide. | shot `c1-narrow-206` |
@@ -290,8 +290,19 @@ Commits: f23d91c (merge of the author's `origin/main`, 7 commits), then the fixe
 | B10 unsure descriptions | One line "Not sure? Leave them in the middle" and per slider "when to move it" (general car handling; the code basis stays below it). | |
 | Words | Optimize → "Find best setup"; Reset (key C) → "C (back to default)"; Change / Leave as is / Locked → "To do" / "Nothing to do" / "Needs a part"; bhp → kW; mode A/B → "Set by hand" / "Downloaded save"; GLOBALB.BUN → "the game file"; LEGAL RESULT sheet removed from the Tuner. | |
 
+### Speed (3e)
+Measured in node on fixture case 24 (3000GT), one tab: `DynoModel.curve` 209,135 calls for 73,769 distinct setups;
+`neighbours` (the optimizer's move list) builds ~80 % of the time. Two caches, results unchanged:
+`DynoModel.curve` per model and bytes (cleared at 100,000 entries), `neighbours` per model and bytes (`legal-opt.ts`).
+20 tabs (2 cars x save/C start x 5 setups) in node: 98.3 s -> 48.9 s, all 20 result byte strings equal.
+Left: building each distinct setup once (`DynoModel.tuned`, ~74,000 per tab).
+Test: `legal-opt.test.ts` "cached curves equal a fresh model".
+
+Power vs top speed: 3000GT Circuit shows 323.5 km/h and 323.5 kW. Two values, from `topSpeed` and `peakPower`
+(`legal-opt.ts` `gameNumbers`); the game showed the same pair (tuner repo `docs/dyno-check-3000gt.md`, row 0 Circuit). Drag: 318.6 km/h, 323.5 kW.
+
 ### Checks (3e)
-- `NFSU2_GLOBALB=<abs>/data/game/GLOBALB.BUN npm test`: **146 tests, 146 pass, 0 fail, 0 skipped** (with `testfile/treav0r` from the author's main).
+- `NFSU2_GLOBALB=<abs>/data/game/GLOBALB.BUN npm test`: **147 tests, 147 pass, 0 fail, 0 skipped** (with `testfile/treav0r` from the author's main).
   `src/test/save.test.ts` unchanged: 70 tests, all pass with the game file.
 - Browser, scripts, logs and shots in tuner repo `native/runs/r3e_ui/` (gitignored) (headless Brave, files answered by Playwright routing from `dist/` and the tuner repo's `data/game/`):
   tuner repo `native/runs/r3e_ui/nosave.cjs` (no save: 3000GT, Pro ECU/Turbo, Extreme transmission, Street suspension/brakes),
