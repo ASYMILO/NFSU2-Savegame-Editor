@@ -308,25 +308,170 @@ export class CurveScreen {
 }
 
 /**
- * RIGHT (+1, bigger ratio) or LEFT (-1) on the final drive row of the Drivetrain screen (handler 0x4FF590, then
- * FUN_00564f10): the value is read back from the byte, moved by range/30 (FUN_00522560, factor 0x786460 = 1/30 as
- * float32), clamped to the range ends and written as trunc(frac*100 + 100.5) (FUN_0059af80). At an end the step is cut
- * short, so the grid of reachable bytes shifts there (bytes 67 and 167 are the ends on the 3000GT).
+ * A number slider of the tuning screens (suspension, final drive, gears, aero, tires, brakes): its box and default, taken
+ * when the screen opens. The key code is the same for all of them (handler 0x4FF590, then FUN_00564f10).
+ */
+export interface RowInfo {
+  param: number;
+  /** Box (FUN_005b2ba0 / FUN_005b2bd0) and default of the row in physics units (gears: ratio). */
+  min: number; max: number; def: number;
+  /** Absolute scale the shown number is clamped to (not for gears). */
+  absMin: number; absMax: number;
+  /** Gears only: km/h = factor / ratio (the screen shows the gear's speed at the rev limiter). */
+  factor: number;
+  /** Scalars: the shown number is the physical value mapped linearly from [absMin, absMax] to [dispLo, dispHi] (FUN_005b2800). */
+  dispLo: number; dispHi: number;
+}
+
+/** Rows of the sliders screens in the order of the game's menus: suspension, drivetrain, aero, tires & brakes. */
+export const ROW_PARAMS = [3, 7, 0, 4, 1, 5, 2, 6, 8, 10, 11, 12, 13, 14, 15, 9, 21, 22, 19, 20, 18];
+
+/**
+ * @returns the row for the car and setup, or null when the installed parts do not unlock it (or it is the nitrous slider).
+ */
+export function rowInfo(model: DynoModel, setup: ArrayLike<number>, param: number): RowInfo | null {
+  if (param >= 9 && param <= 15) {
+    const g = model.gearing(setup), row = g?.rows.find((r) => r.param === param);
+    if (!g || !row) return null;
+    const abs = param === FD_BYTE ? model.absoluteRange(setup, FD_BYTE) : [-Infinity, Infinity];
+    return {
+      param, min: f(row.min), max: f(row.max), def: f(row.stock), absMin: f(abs[0]), absMax: f(abs[1]),
+      factor: param === FD_BYTE ? 0 : f(g.speedFactor), dispLo: f(abs[0]), dispHi: f(abs[1]),
+    };
+  }
+  const row = model.scalarTuning(setup).find((r) => r.param === param);
+  if (!row || !row.editable || param === 16 || param === 17) return null;
+  const [absMin, absMax] = model.absoluteRange(setup, param);
+  // the shown scale of the whole row (ScalarRow.display* belong to the box), as scalarTuning builds it
+  const rec = model.tuningRecords.get(param)!, hi0 = absMax === absMin ? absMax + 0.01 : absMax;
+  const explicit = (v: number | undefined): v is number => v !== undefined && Math.abs(v + 99.99) > 0.001;
+  const metric = param === 3 || param === 7 ? 100 : 1;
+  const dispLo = explicit(rec.displayMin) ? rec.displayMin : absMin * metric;
+  const dispHi = explicit(rec.displayMax) ? rec.displayMax : hi0 * metric;
+  return {
+    param, min: f(row.min), max: f(row.max), def: f(row.stock), absMin: f(absMin), absMax: f(absMax), factor: 0,
+    dispLo: f(dispLo), dispHi: f(dispHi),
+  };
+}
+
+/**
+ * RIGHT (+1) or LEFT (-1) on a number slider: the shown value is read back from the byte, moved by one thirtieth of the
+ * row's box (FUN_00522560, 1/30 as float32), clamped to the box ends and written as trunc(frac*100 + 100.5) (FUN_0059af80).
+ * At an end the step is cut short, so the grid of reachable bytes shifts there (final drive on the 3000GT: bytes 67..167).
+ * A gear shows its speed in km/h (factor / ratio) and moves its neighbours to keep the 0.05 spacing (withGearRatio).
  * shortcut: a start byte far outside the box (hand-edited save) is not checked against the game.
+ * @returns the setup after the key, or null when the key changes nothing.
+ */
+export function pressRow(model: DynoModel, info: RowInfo, setup: ArrayLike<number>, dir: 1 | -1): Uint8Array | null {
+  return pressRowState(model, info, { setup: Uint8Array.from(setup), ratios: null }, dir)?.setup ?? null;
+}
+
+/**
+ * What a visit to the Drivetrain screen holds: the setup bytes and, for gears, the ratios as floats (the game writes the
+ * bytes from them after every key, so a gear nobody touched keeps its byte). `ratios` null = decode them from the bytes.
+ */
+export interface RowState { setup: Uint8Array; ratios: number[] | null }
+
+/** The screen after the game built the car from these bytes (the load re-encodes gear and nitrous bytes it pulls into range). */
+export function openRow(model: DynoModel, setup: ArrayLike<number>): RowState {
+  const loaded = Uint8Array.from(setup);
+  model.tuned(setup, loaded);
+  return { setup: loaded, ratios: null };
+}
+
+/** {@link pressRow} with the gear state kept between keys. */
+export function pressRowState(model: DynoModel, info: RowInfo, st: RowState, dir: 1 | -1): RowState | null {
+  const { param, min, max, def } = info, setup = st.setup;
+  const t = Math.max(-1, Math.min(1, f(f(setup[param] - 100) * f(0.01))));
+  // the screen shows the value on the absolute scale (FUN_00401790 clamps to it), a hair wider than the box
+  const v = clamp32(f(f(f(max - min) * f(t)) + def), info.absMin, info.absMax);
+  if (info.factor) {
+    // gears: the number is the speed, so the box and step are in km/h
+    const lo = f(info.factor / max), hi = f(info.factor / min), shown = f(info.factor / v);
+    const step = f(f(hi - lo) * f(1 / 30));
+    const nv = dir > 0 ? Math.min(f(shown + step), hi) : Math.max(f(shown - step), lo);
+    if (f(nv) === f(shown)) return null;
+    const next = model.withGearRatioKept(setup, st.ratios, param, clamp32(f(info.factor / nv), min, max));
+    return { setup: next.setup, ratios: next.ratios };
+  }
+  // the number on the screen: physical value -> shown scale (float32 like FUN_00401790); the key works on that number
+  const toShown = (x: number): number => lerp(x, info.absMin, info.absMax, info.dispLo, info.dispHi);
+  const fromShown = (x: number): number => lerp(x, info.dispLo, info.dispHi, info.absMin, info.absMax);
+  const a = toShown(min), b = toShown(max), lo = Math.min(a, b), hi = Math.max(a, b), shown = toShown(v);
+  const step = f(f(hi - lo) * f(1 / 30));
+  const nv = dir > 0 ? Math.min(f(shown + step), hi) : Math.max(f(shown - step), lo);
+  if (f(nv) === f(shown)) return null;
+  const out = Uint8Array.from(setup);
+  out[param] = encodeGearByte(clamp32(fromShown(nv), min, max), def, min, max);
+  return { setup: out, ratios: st.ratios };
+}
+
+const sameBytes = (a: ArrayLike<number>, b: ArrayLike<number>): boolean => a.length === b.length && Array.prototype.every.call(a, (x, i) => x === b[i]);
+
+/** Key C on a row: its byte goes to 100 and the car is rebuilt (the build re-encodes gear bytes); other rows keep theirs. */
+export function resetRow(model: DynoModel, setup: ArrayLike<number>, param: number): RowState {
+  const out = Uint8Array.from(setup);
+  out[param] = 100;
+  // a default outside the row's box (the parts leave no room for it) is pulled to the box end when the car is built
+  const info = rowInfo(model, out, param);
+  if (info && !info.factor) out[param] = encodeGearByte(clamp32(info.def, info.min, info.max), info.def, info.min, info.max);
+  return openRow(model, out);
+}
+
+/**
+ * RIGHT / LEFT on the final drive row (see {@link pressRow}).
  * @returns the setup after the key, or null when the key changes nothing or the final drive is locked.
  */
 export function pressFinalDrive(model: DynoModel, setup: ArrayLike<number>, dir: 1 | -1): Uint8Array | null {
-  const row = model.gearing(setup)?.rows.find((r) => r.param === FD_BYTE);
-  if (!row) return null;
-  const min = f(row.min), max = f(row.max), def = f(row.stock);
-  const t = Math.max(-1, Math.min(1, f(f(setup[FD_BYTE] - 100) * f(0.01))));
-  // the screen shows the value on the absolute scale (FUN_00401790 clamps to it), a hair wider than the box
-  const [absMin, absMax] = model.absoluteRange(setup, FD_BYTE).map(f);
-  const v = clamp32(f(f(f(max - min) * f(t)) + def), absMin, absMax);
-  const step = f(f(max - min) * f(1 / 30));
-  const nv = dir > 0 ? Math.min(f(v + step), max) : Math.max(f(v - step), min);
-  if (f(nv) === f(v)) return null;
-  const out = Uint8Array.from(setup);
-  out[FD_BYTE] = encodeGearByte(nv, def, min, max);
-  return out;
+  const info = rowInfo(model, setup, FD_BYTE);
+  return info ? pressRow(model, info, setup, dir) : null;
 }
+
+/**
+ * The nitrous slider (FUN_00523210): one number, the duration; the intensity moves the other way. The widget keeps its own
+ * float (it is not read back from the bytes), so the screen is a small state machine like {@link CurveScreen}. Its step is a
+ * tenth of the box (0x54A1C5). Key C is not modelled: whether the widget re-reads the byte after C is not known.
+ */
+export class NitroScreen {
+  readonly bytes: [number, number];
+  private constructor(private readonly rows: NitroRows, private setup: Uint8Array, readonly widget: number) {
+    this.bytes = [setup[16], setup[17]];
+  }
+
+  /** @returns null when no installed part unlocks nitrous. */
+  static open(model: DynoModel, setup: ArrayLike<number>): NitroScreen | null {
+    const rows = model.scalarTuning(setup), d = rows.find((r) => r.param === 16), i = rows.find((r) => r.param === 17);
+    if (!d || !i || !d.editable || !i.editable) return null;
+    const nr: NitroRows = {
+      lo: f(d.min), hi: f(d.max), def: f(d.stock), step: f(f(f(d.max) - f(d.min)) * f(0.1)),
+      lo2: f(i.min), hi2: f(i.max), def2: f(i.stock),
+    };
+    const t = Math.max(-1, Math.min(1, f(f(setup[16] - 100) * f(0.01))));
+    const widget = clamp32(f(f(f(nr.hi - nr.lo) * f(t)) + nr.def), nr.lo, nr.hi);
+    return new NitroScreen(nr, Uint8Array.from(setup), widget);
+  }
+
+  /** Setup bytes now (the 41 bytes with the nitrous pair). */
+  setupBytes(): Uint8Array { return this.setup.slice(); }
+
+  /** Float state of the widget as text (equal states have equal keys). */
+  get key(): string { return `${this.widget}|${this.bytes}`; }
+
+  /**
+   * FUN_005b4670 on 0x10: the duration byte, and the intensity as the mirror image of the duration inside its own range
+   * (FUN_005b3100: def2 - (v - def) / (hi - lo) * (hi2 - lo2)).
+   * @returns the screen after the key, or null when the key changes nothing.
+   */
+  press(dir: 1 | -1): NitroScreen | null {
+    const r = this.rows;
+    const nv = dir > 0 ? Math.min(f(this.widget + r.step), r.hi) : Math.max(f(this.widget - r.step), r.lo);
+    if (f(nv) === f(this.widget)) return null;
+    const setup = this.setup.slice();
+    setup[16] = encodeGearByte(nv, r.def, r.lo, r.hi);
+    const other = f(r.def2 - f(f(f(nv - r.def) / f(r.hi - r.lo)) * f(r.hi2 - r.lo2)));
+    setup[17] = encodeGearByte(other, r.def2, r.lo2, r.hi2);
+    return new NitroScreen(r, setup, nv);
+  }
+}
+
+interface NitroRows { lo: number; hi: number; def: number; step: number; lo2: number; hi2: number; def2: number }

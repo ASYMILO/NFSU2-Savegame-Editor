@@ -772,9 +772,11 @@ export class DynoModel {
   /**
    * Applies a dyno setup like the game's tuning load.
    * @param setup 41 setup bytes.
+   * @param loaded Optional: receives the setup bytes as the load leaves them (the load re-encodes the gear and nitrous
+   *   bytes it pulls into range; this is what the tuning screens hold after building the car).
    * @returns Final physics with uniques.
    */
-  tuned(setup: ArrayLike<number>): Phys {
+  tuned(setup: ArrayLike<number>, loaded?: Uint8Array): Phys {
     const p = clonePhys(this.base);
     const gearBytes = Uint8Array.from(setup);
     this.defs = new Map();
@@ -830,6 +832,7 @@ export class DynoModel {
       }
     }
     applyScalars(16, 22);
+    if (loaded) loaded.set(gearBytes);
     const sum = () => { let t = 0; for (let i = 0; i < 9; i++) t += g(p, 0x200 + 4 * i); return t; };
     const s0 = sum();
     for (const [prm, off] of [[P_ECU, ECU_OFF], [P_TURBO, TURBO_OFF]] as const) {
@@ -1100,6 +1103,27 @@ export class DynoModel {
     this.setGear(p, ratio, param);
     for (let gear = 10; gear <= 15; gear++) if (this.defs.has(gear)) encode(gear, g(p, 0x1b0 + gear * 4));
     return out;
+  }
+
+  /**
+   * The tuning screens' gear setter with its float state: the game keeps the ratios as floats between keys and writes every
+   * gear byte from them (FUN_005b4670), so a gear nobody touched keeps its byte. {@link withGearRatio} decodes the bytes
+   * again on each call and can land one byte away on such a gear.
+   * @param ratios Gear ratios (index 10..15) the screen holds, or null to take them from the bytes (a fresh build).
+   * @returns The bytes and the ratios after the key.
+   */
+  withGearRatioKept(setup: ArrayLike<number>, ratios: ArrayLike<number> | null, param: number, ratio: number):
+    { setup: Uint8Array; ratios: number[] } {
+    const out = Uint8Array.from(setup);
+    const p = this.tuned(setup);
+    if (ratios) for (let gear = 10; gear <= 15; gear++) if (this.defs.has(gear)) s(p, 0x1b0 + gear * 4, ratios[gear]);
+    if (this.defs.has(param) && Number.isFinite(ratio)) this.setGear(p, ratio, param);
+    for (let gear = 10; gear <= 15; gear++) {
+      if (!this.defs.has(gear)) continue;
+      const [min, max] = this.range(p, gear);
+      out[gear] = encodeGearByte(g(p, 0x1b0 + gear * 4), this.defs.get(gear) as number, min, max);
+    }
+    return { setup: out, ratios: Array.from({ length: 16 }, (_, k) => (k >= 10 ? g(p, 0x1b0 + k * 4) : 0)) };
   }
 
   /** Power-band coverage for every forward shift, including those outside a timed run. */
