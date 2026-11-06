@@ -162,9 +162,10 @@
               <text class="dyno-axis" x="2" ng-attr-y="{{ step.chart.bottom + 30 }}">RPM</text>
             </svg>
             <ol class="tuner-howto" ng-if="step.chart">
-              <li>Press Reset (key C). All 9 bars go back to default and bar 1 (left) is picked.</li>
-              <li>1st round: on each bar press UP or DOWN as many times as it says (– = none), then RIGHT to the next bar.</li>
-              <li ng-if="step.chart.passLabels.length > 1">After bar 9 press LEFT 8 times to get back to bar 1. Do the 2nd round the same way{{ step.chart.passLabels.length > 2 ? ', then the 3rd' : '' }}.</li>
+              <li>Open the screen. Bar 1 (left) is picked. Press Reset (key C): all 9 bars go back to default.</li>
+              <li>On each bar press UP or DOWN as many times as it says (– = none), then RIGHT to the next bar.</li>
+              <li ng-if="step.chart.passLabels.length > 1">On bar 9, RIGHT takes you back to bar 1. Do the 2nd round the same way{{ step.chart.passLabels.length > 2 ? ', then the 3rd' : '' }}.</li>
+              <li>Stop after the last bar with presses.</li>
             </ol>
           </div>
         </div>

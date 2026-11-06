@@ -73,7 +73,8 @@ export function unlockParts(game: GameData, params: number[]): string[] {
     const low = Math.min(...recs.map((t) => t.level));
     for (const t of recs.filter((x) => x.level === low)) {
       const p = PERF_PARTS[t.item];
-      const text = p.category === 'AE' ? p.label : `${p.label} (${LEVEL_NAMES[t.level] ?? `level ${t.level}`})`;
+      // aero: the game takes the body part's level, not a shop item (docs/native-menu-map.md "Locked screens", tuner repo)
+      const text = p.category === 'AE' ? `a body-shop ${p.label.replace(/ L\d$/, '').toLowerCase()} (not stock)` : `${p.label} (${LEVEL_NAMES[t.level] ?? `level ${t.level}`})`;
       if (!out.includes(text)) out.push(text);
     }
   }
@@ -150,6 +151,26 @@ export interface TunerStep {
 
 /** Key C on a tuning screen ("Reset to default"); it resets the selected row, or all 9 bars of a graph (native-menu-map.md l.174-181). */
 export const RESET = 'Reset (key C)';
+
+/**
+ * Every key on an ECU / Turbo graph for a plan's rounds: C, then bar 1 to 9 per round (UP / DOWN as planned, RIGHT to the
+ * next bar). The bars are a ring: RIGHT on bar 9 picks bar 1 and LEFT on bar 1 picks bar 9 (code: FUN_00522eb0,
+ * data/ghidra_decomp.c l.206897 of the tuner repo; game: native/runs/wrap_20261106, ECU and Turbo). Bar 1 is picked when
+ * the screen opens and C does not move the pick (game: same runs and native/runs/locked_20261106). The keys stop after the
+ * last bar with presses. Shortcut: LEFT back to a nearer bar would save at most 3 keys on the 3000GT plans; not used, so
+ * the rule stays "always RIGHT".
+ */
+export function curveKeys(passes: number[][]): string[] {
+  const keys = ['C'];
+  const last = passes.length - 1;
+  const end = last < 0 ? -1 : passes[last].reduce((e, n, i) => (n ? i : e), -1);
+  passes.forEach((row, p) => row.forEach((n, col) => {
+    for (let k = 0; k < Math.abs(n); k++) keys.push(n > 0 ? 'UP' : 'DOWN');
+    if (p < last || col < end) keys.push('RIGHT');
+  }));
+  return keys;
+}
+
 const runText = (runs: number[]): string => runs.map((n) => `${n > 0 ? 'RIGHT' : 'LEFT'} ×${Math.abs(n)}`).join(', then ');
 
 /**
@@ -163,7 +184,7 @@ export function tunerSteps(model: DynoModel, r: TabResult, fromC: boolean): Tune
   for (const p of menuOrder(r.plan.plans)) {
     if (p.id === 'ecu' || p.id === 'turbo') {
       touched.add(p.id);
-      steps.push({ screen: p.screen, row: 'Bars', keys: `${RESET}, then the presses under each bar`, shows: '', presses: p.presses, curve: p.id, passes: p.passes });
+      steps.push({ screen: p.screen, row: 'Bars', keys: `${RESET}, then the presses under each bar`, shows: '', presses: curveKeys(p.passes).length, curve: p.id, passes: p.passes });
       continue;
     }
     const param = p.row?.param ?? 9;
@@ -173,7 +194,7 @@ export function tunerSteps(model: DynoModel, r: TabResult, fromC: boolean): Tune
     const keys = [c ? RESET : '', runs.length ? runText(runs) : ''].filter(Boolean).join(', then ') || 'no key';
     steps.push({
       screen: p.screen, row: p.row?.label ?? 'Final Drive Ratio', keys, shows: shownText(model, p.setup, param),
-      from: shownText(model, r.start, param), presses: p.presses + (c && p.start !== 'C' ? 1 : 0),
+      from: shownText(model, r.start, param), presses: runs.reduce((a, n) => a + Math.abs(n), 0) + (c ? 1 : 0),
     });
   }
   if (fromC) {
@@ -214,7 +235,7 @@ export function screenPlans(model: DynoModel, setups: number[], steps: TunerStep
     const own = steps.filter((s) => s.screen === name);
     if (own.length) return { name, state: 'set', text: '', steps: own };
     if (!params.some((p) => model.tuningRecords.has(p))) {
-      return { name, state: 'locked', text: `Locked in the game. Any of these parts opens it: ${unlockParts(model.game, params).join(', ')}.`, steps: [] };
+      return { name, state: 'locked', text: `Locked in the game: its icon has a padlock and Enter does nothing. Any of these parts opens it: ${unlockParts(model.game, params).join(', ')}.`, steps: [] };
     }
     if (TUNED.has(name)) return { name, state: 'ok', text: 'Already right for this race.', steps: [] };
     // drift and Street X presets zero nitrous duration (docs/setup-bytes.md l.103, FUN_005b4dc0)

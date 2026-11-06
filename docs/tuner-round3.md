@@ -120,7 +120,7 @@ settings, "Circuit Tab" suffix not needed, career vs Quick Race must be clear, t
 | Feedback | Done | Source |
 |---|---|---|
 | C = reset? | Every key C reads **Reset (key C)**. One box on top: it is the game's "Reset to default"; on a slider screen it resets only the selected row, on ECU and Turbo all 9 bars. | `docs/native-menu-map.md` l.174-181 (measured) |
-| ▲/▼ rows | Under each bar: **Bar 1..9**, the rpm, then per round **UP 3 / DOWN 1 / –** in words; rows named 1st, 2nd, 3rd. Three numbered lines under the chart: Reset (bar 1 is picked), UP/DOWN then RIGHT to the next bar, after bar 9 LEFT ×8 back to bar 1 for the next round. | Order = `curvePlanner` in `src/model/hand-input.ts` (C, then bars 0..8 per pass); the key list that passed the in-game check does exactly this: `native/runs/dyno_check_20261106/steps_a.mjs` l.24-27 (LEFT ×8 between rounds, RIGHT after each bar) |
+| ▲/▼ rows | Under each bar: **Bar 1..9**, the rpm, then per round **UP 3 / DOWN 1 / –** in words; rows named 1st, 2nd, 3rd. Three numbered lines under the chart: Reset, UP/DOWN then RIGHT to the next bar, after bar 9 LEFT ×8 back to bar 1 for the next round (changed in 3c-2: RIGHT once). | Order = `curvePlanner` in `src/model/hand-input.ts` (C, then bars 0..8 per pass); the key list that passed the in-game check does exactly this: `native/runs/dyno_check_20261106/steps_a.mjs` l.24-27 (LEFT ×8 between rounds, RIGHT after each bar) |
 | Before / after | Table "Dyno: Now (save) → After the steps" (0-60, 0-100, top speed, power). Without a save the first column is "After reset". Slider steps read "Final Drive Ratio: 4.05 → 3.96. Keys: Reset (key C)". | Numbers: `gameNumbers(model.evaluate(start))` and the plan's mode A; slider numbers: `shownText` on the start and on the plan, no new numbers |
 | Parts "None" | **Every card lists all 7 screens of the game's menu.** A screen without a part: **Locked**, with the parts that open it. A screen Optimize does not tune: **Leave as is**, one line at the end: Optimize tunes only Drivetrain, ECU and Turbo, the dyno measures speed, not grip or handling (checked: on the owner's 3000GT Optimize changes only byte 9 and bytes 23-40). Drift and Street X: "This race type turns nitrous off anyway". | Locked / which part: the game's tuning records in GLOBALB.BUN (`unlockParts`, `categoryScreens` in `src/model/tuner.ts`; rule `docs/setup-bytes.md` l.42); nitrous: `docs/setup-bytes.md` l.103 |
 | Parts list | Every part has a line under it: what it opens in the game. Engine and Weight reduction: "Counts on the dyno. Opens no tuning screen" (no tuning record for EN or WT in the game data, test). Transmission: gears only with Extreme (6-speed). **New: Front bumper (aero) and Spoiler (aero), level 1-3**; they open Aerodynamics (front / rear downforce). The Tuner had no field for them. | Records: `docs/setup-bytes.md` l.17-40 and the game data; aero flags `AE_FRONT_BUMPER_L1..3`, `AE_SPOILER_L1..3` (`withAero` in `src/model/virtual-save.ts`) |
@@ -156,9 +156,43 @@ buttons in game order); "Round 2" ran into bar 1's presses (now 1st / 2nd / 3rd)
 choice); slider steps read keys first, values last (now "4.05 → 3.96. Keys: …"). Still heavy: ECU and Turbo charts each take a screen
 height; the red / yellow marks of the chart have no legend (author's chart).
 
-Not checked (3c): nothing of 3c was tried in the running game. Not seen in game: how the game shows a locked screen (hidden or greyed),
+Not checked (3c, first pass; see 3c-2 for what was checked later): nothing of 3c was tried in the running game. Not seen in game: how the game shows a locked screen (hidden or greyed),
 and which body parts in the shop set the aero flags (the editor reads them as flags 56-67). "Reset (key C)" resets the selected row: measured
 for suspension and final drive, from code for the others; not tried on 6-speed gears. Phone widths and other browsers not tried.
+
+## 3c-2. Bar 9 wraps to bar 1; the open points checked in the game (2026-11-06)
+
+Owner: "on the last bar RIGHT probably jumps to the start, check it, it makes the instruction simpler". Facts and runs are in
+the tuner repo (`docs/native-menu-map.md` "Graph bars wrap" and "Locked screens", `docs/dyno-check-3000gt.md` "Round 3c").
+
+| Question | Answer | Proof |
+|---|---|---|
+| RIGHT on bar 9 -> bar 1? LEFT on bar 1 -> bar 9? | **Yes on ECU and on Turbo** (both ways). Nitrous has no bars: RIGHT/LEFT stop at the ends. | Code `FUN_00522eb0` (ring; `data/ghidra_decomp.c` l.206895-206925), Nitrous `FUN_00523210` l.207087; game: `native/runs/wrap_20261106/bytes.txt` (T1, T2, T4, `nos_r6`, `nos_l11`) |
+| Does Reset (C) pick bar 1? | **No.** C keeps the picked bar; bar 1 is picked when the screen opens. | game: `native/runs/locked_20261106/run_L1` T5 (RIGHT ×3, C, UP moves bar 4) |
+| The 3c plan typed in the game, 5 tabs of the 3000GT | Game = mode A in all 5: Circuit 4.22 / 10.35 / 323.5, Drag 4.10 / 10.14 / 318.6, Drift 4.22 / 10.22 / 318.6, Street X 4.10 / 10.12 / 309.0, URL Race 4.20 / 10.33 / 323.5. All 41 bytes checked after every key. | `native/runs/tuner3c_20261106/` (`results_A_all.png`, `records.json`, `s*/log.txt`) |
+| How the game shows a locked screen | The icon stays in the list with a **padlock**; Enter does nothing. | `native/runs/locked_20261106/L1_master_all.png`, `L2_master_all.png`; fng stays `UI_PerformanceTuning_Master.fng` |
+| Which body parts open Aerodynamics | A **non-stock front bumper** (front downforce) and **spoiler** (rear). Stock front bumper + stock spoiler lock it even with the save's flags set; rear bumper and side skirts do not open it. Clearing the save's aero flags does nothing: the game rebuilds them from the body parts. | game: L1 / L2 runs above; code: `FUN_006399D0` (`technical.md` "Visual-derived group-9 flags"), records `docs/setup-bytes.md` l.35-36 |
+| Reset on 6-speed gears | C resets only that gear; a neighbour it pushed before stays where it is. | game, every-part copy: `native/runs/gear_lvl3_20261106/log.txt` f=4168 / f=4210 (3rd gear 78 -> 100, 4th stays 98); `docs/game-input-rules.md` |
+| Does C work on Nitrous | Yes: duration and intensity back to 100. | `native/runs/wrap_20261106/bytes.txt` `nos_C1`; `tune_screens_20261106/bytes.txt` l.80 |
+
+Changes:
+- `src/model/tuner.ts` `curveKeys`: the keys of a graph = C, then bar 1..9 per round, RIGHT after each bar, RIGHT on bar 9 back
+  to bar 1, stop after the last bar with presses. The card's "key presses in all" now counts every key (C, UP/DOWN, RIGHT).
+  Bar moves per graph on the 3000GT: 9-25 (was 24-40 with LEFT ×8). Going LEFT to a nearer bar would save at most 3 more; not
+  used, so the rule stays "always RIGHT". Test in `src/test/tuner.test.ts`.
+- How-to under the chart: "Open the screen. Bar 1 (left) is picked. Press Reset (key C) ..." / "... then RIGHT to the next bar" /
+  "On bar 9, RIGHT takes you back to bar 1. Do the 2nd round the same way." / "Stop after the last bar with presses."
+  (the old line said C picks bar 1; the game says it does not).
+- Locked screens: "Locked in the game: its icon has a padlock and Enter does nothing." Aero parts read "a body-shop front bumper
+  (not stock)" / "a body-shop spoiler (not stock)"; the part list's aero hint says rear bumper and side skirts open nothing.
+
+Screen: ![ECU bars with the new how-to](img/r3c-7-bars-wrap.png) (headless Brave, http://127.0.0.1:8771/, no save, 3000GT with ECU /
+Turbo / Transmission Pro; no page errors).
+
+Tests: `npm test` **131, 110 pass, 0 fail, 21 skipped**; `src/test/save.test.ts` unchanged.
+
+Not checked (3c-2): a stock front bumper with a body-shop spoiler (code says: only rear downforce); the Tuner's no-save mode
+typed in the game; LEFT to a nearer bar (not used); imperial units; phone widths and other browsers.
 
 ## 7. Undo
 

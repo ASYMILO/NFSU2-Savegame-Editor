@@ -6,7 +6,7 @@ import { defaultSetup } from '../model/legal-opt.js';
 import type { SliderPlan } from '../model/hand-input.js';
 import { CurveScreen, NitroScreen, openRow, pressFinalDrive, pressRowState, resetRow, rowInfo } from '../model/tune-keys.js';
 import {
-  categoryScreens, groupTabs, legalOptions, menuOrder, planTab, SCREEN_ORDER, screenPlans, startAfterC, tunerSteps, unlockParts, type TabResult,
+  categoryScreens, curveKeys, groupTabs, legalOptions, menuOrder, planTab, SCREEN_ORDER, screenPlans, startAfterC, tunerSteps, unlockParts, type TabResult,
 } from '../model/tuner.js';
 import { PERF_PARTS } from '../data/perf-parts.js';
 import { installedForLevels, withAero } from '../model/virtual-save.js';
@@ -109,7 +109,7 @@ test('no save: every step starts with C, and every curve and drivetrain row Opti
 test('which part opens which screen comes from the game\'s tuning records', { skip: SKIP }, () => {
   const game = parseGameData(new Uint8Array(readFileSync(GAME_BUN)));
   assert.deepEqual(unlockParts(game, [0, 1, 2, 3, 4, 5, 6, 7, 8]), ['Sport Springs And Shocks (Street)', 'Strut Tower Bar (Street)', 'Camber Kit (Pro)']);
-  assert.deepEqual(unlockParts(game, [21, 22]), ['Front Bumper L1', 'Spoiler L1']);
+  assert.deepEqual(unlockParts(game, [21, 22]), ['a body-shop front bumper (not stock)', 'a body-shop spoiler (not stock)']);
   assert.deepEqual(categoryScreens(game, 'BR'), ['Tires & Brakes']);
   assert.deepEqual(categoryScreens(game, 'TR'), ['Drivetrain']);
   assert.deepEqual(categoryScreens(game, 'EN'), []);
@@ -133,4 +133,13 @@ test('aero levels set one front bumper and one spoiler flag', () => {
   const on = withAero(new Array(68).fill(false), { AEF: 2, AES: 3 });
   assert.deepEqual(on.flatMap((b, i) => (b ? [PERF_PARTS[i].key] : [])), ['AE_FRONT_BUMPER_L2', 'AE_SPOILER_L3']);
   assert.ok(!withAero(on, { AEF: 0, AES: 0 }).some(Boolean));
+});
+
+test('graph keys: RIGHT after every bar, RIGHT on bar 9 wraps to bar 1, stop after the last bar with presses', () => {
+  // two rounds; the 2nd ends on bar 3 (game: native/runs/wrap_20261106 of the tuner repo, ECU and Turbo)
+  const keys = curveKeys([[2, 0, -1, 0, 0, 0, 0, 0, 1], [0, 0, 1, 0, 0, 0, 0, 0, 0]]);
+  assert.deepEqual(keys, ['C', 'UP', 'UP', 'RIGHT', 'RIGHT', 'DOWN', 'RIGHT', 'RIGHT', 'RIGHT', 'RIGHT', 'RIGHT', 'RIGHT', 'UP', 'RIGHT',
+    'RIGHT', 'RIGHT', 'UP']);
+  assert.equal(keys.filter((k) => k === 'LEFT').length, 0);
+  assert.deepEqual(curveKeys([]), ['C']);
 });

@@ -231,7 +231,9 @@ export function attachTuner($scope: EditorScope, api: TunerApi): () => void {
 /** What a part category opens in the game, from the game's tuning records. */
 function partHint(game: GameData, code: string): string {
   const aero = AERO_PARTS.find((a) => a.code === code);
-  if (aero) return `Opens Aerodynamics (${code === 'AEF' ? 'front' : 'rear'} downforce) in the game.`;
+  // game: a stock front bumper and spoiler lock Aerodynamics even with the save's aero flags set; rear bumper and side
+  // skirts at level 2 do not open it (tuner repo native/runs/locked_20261106, docs/native-menu-map.md "Locked screens")
+  if (aero) return `A body-shop ${code === 'AEF' ? 'front bumper' : 'spoiler'} opens Aerodynamics (${code === 'AEF' ? 'front' : 'rear'} downforce). A stock one does not. Rear bumper and side skirts open nothing.`;
   const screens = categoryScreens(game, code);
   if (!screens.length) return 'Counts on the dyno. Opens no tuning screen in the game.';
   // gears 10-15 have a record only for the 6-speed transmission (L3), final drive for every level
@@ -281,7 +283,7 @@ function cards(src: Source, results: TabResult[]): TunerCardView[] {
       ],
       bLine: same ? 'Writing to the save gives the same numbers.'
         : `Writing to the save would give ${table.map((row) => row.b).join(' · ')} (by hand minus save: ${table.map((row) => row.diff).join(' · ')}).`,
-      presses: r.plan.presses,
+      presses: steps.reduce((n, s) => n + s.presses, 0),
       screens: screenPlans(src.model, group.map((x) => x.setup), steps).map((x) => ({ ...x, badge: BADGES[x.state] })),
       note: group.some((x) => x.setup === 1) ? 'In Drag races you shift by hand. The dyno shifts by itself.' : '',
       table,
