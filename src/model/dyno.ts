@@ -968,6 +968,11 @@ export class DynoModel {
     return { min, max, def: (this.curveDefs.get(param) as number[])[i], absMin, absMax };
   }
 
+  /** Absolute range (the screen's slider scale, FUN_005aca50) of a tuning parameter, e.g. 9 for the final drive. */
+  absoluteRange(setup: ArrayLike<number>, param: number): [number, number] {
+    return this.absRange(this.tuned(setup), param);
+  }
+
   /**
    * Torque the unique parts add to column i of the ECU / turbo tables (kN·m, FUN_005997e0): engine, ECU and turbo
    * uniques, 0 when not installed. The tuning setter takes them out before it works on a curve and puts them back.

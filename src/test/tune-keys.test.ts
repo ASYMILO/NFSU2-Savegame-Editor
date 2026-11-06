@@ -1,8 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
-import { DynoModel, findCar, parseGameData } from '../model/dyno.js';
-import { CurveScreen } from '../model/tune-keys.js';
+import { DynoModel, encodeGearByte, findCar, parseGameData } from '../model/dyno.js';
+import { CurveScreen, pressFinalDrive } from '../model/tune-keys.js';
 
 // Reference bytes come from SPEED2.EXE's own press code in the emulator (tools/emu/press_cases.py): numbers only.
 // The first cases are the sequences measured in the running game (docs/native-menu-map.md in the tuner repo).
@@ -12,15 +12,18 @@ const SKIP = !existsSync(GAME_BUN) && 'GLOBALB.BUN (set NFSU2_GLOBALB) missing';
 
 type Op = [number, 1 | -1] | 'C';
 interface Case {
-  hash: number; installed: number[]; uniques: number[]; setup: number[]; screen: 'ecu' | 'turbo'; ops: Op[];
+  hash: number; installed: number[]; uniques: number[]; setup: number[]; screen: 'ecu' | 'turbo' | 'fd'; ops: Op[];
   measured: boolean; start: number[]; bytes: number[][];
 }
 const fixture = JSON.parse(readFileSync(new URL('../../src/test/fixtures/press-reference.json', import.meta.url), 'utf8')) as { cases: Case[] };
 
-function open(game: ReturnType<typeof parseGameData>, c: Case): CurveScreen {
+function model(game: ReturnType<typeof parseGameData>, c: Case): DynoModel {
   const car = findCar(game, c.hash >>> 0);
   assert.ok(car, `unknown car ${c.hash}`);
-  return new CurveScreen(new DynoModel(game, car, c.installed.map((b) => b !== 0), c.uniques), c.setup, c.screen);
+  return new DynoModel(game, car, c.installed.map((b) => b !== 0), c.uniques);
+}
+function open(game: ReturnType<typeof parseGameData>, c: Case): CurveScreen {
+  return new CurveScreen(model(game, c), c.setup, c.screen as 'ecu' | 'turbo');
 }
 
 test('ECU: UP, UP, DOWN on the idle column gives the bytes measured in the game', { skip: SKIP }, () => {
@@ -46,7 +49,7 @@ test('Turbo: UP, UP, DOWN on column 3 gives the bytes measured in the game', { s
 test('every key of 107 sequences (40 part sets, ECU and Turbo, with Reset) writes the bytes the game writes', { skip: SKIP }, () => {
   const game = parseGameData(new Uint8Array(readFileSync(GAME_BUN)));
   let steps = 0;
-  fixture.cases.forEach((c, n) => {
+  fixture.cases.filter((c) => c.screen !== 'fd').forEach((c, n) => {
     const s = open(game, c);
     c.ops.forEach((op, k) => {
       s.run([op]);
@@ -55,6 +58,24 @@ test('every key of 107 sequences (40 part sets, ECU and Turbo, with Reset) write
     });
   });
   assert.ok(steps > 1000, `only ${steps} steps`);
+});
+
+test('final drive: RIGHT / LEFT presses from 100, from 167 and from saved bytes, across both range ends', { skip: SKIP }, () => {
+  const game = parseGameData(new Uint8Array(readFileSync(GAME_BUN)));
+  let steps = 0;
+  fixture.cases.filter((c) => c.screen === 'fd').forEach((c, n) => {
+    const m = model(game, c);
+    let setup: Uint8Array = Uint8Array.from(c.setup);
+    // A start byte outside the box (hand-edited save) is not checked.
+    const row = m.gearing(setup)!.rows.find((r) => r.param === 9)!;
+    if (c.setup[9] > encodeGearByte(row.max, row.stock, row.min, row.max) || c.setup[9] < encodeGearByte(row.min, row.stock, row.min, row.max)) return;
+    c.ops.forEach((op, k) => {
+      setup = pressFinalDrive(m, setup, op[1] as 1 | -1) ?? setup;
+      steps++;
+      assert.equal(setup[9], c.bytes[k][0], `case ${n} step ${k}`);
+    });
+  });
+  assert.ok(steps >= 1000);
 });
 
 test('a press at the end of the box changes nothing; Reset gives 100 everywhere', { skip: SKIP }, () => {

@@ -14,6 +14,9 @@
  */
 import { CURVE_POINTS, ECU_OFF, TURBO_OFF, encodeGearByte, type CurveKind, type DynoModel } from './dyno.js';
 
+/** Setup byte of the final drive. */
+const FD_BYTE = 9;
+
 const f = Math.fround;
 /** 0x7A0354, 1e-7 as float32: redistribution stops below it. */
 const EPS = f(1e-7);
@@ -293,4 +296,28 @@ export class CurveScreen {
       if (k === 'C') this.reset(); else this.press(k[0], k[1]);
     }
   }
+}
+
+/**
+ * RIGHT (+1, bigger ratio) or LEFT (-1) on the final drive row of the Drivetrain screen (handler 0x4FF590, then
+ * FUN_00564f10): the value is read back from the byte, moved by range/30 (FUN_00522560, factor 0x786460 = 1/30 as
+ * float32), clamped to the range ends and written as trunc(frac*100 + 100.5) (FUN_0059af80). At an end the step is cut
+ * short, so the grid of reachable bytes shifts there (bytes 67 and 167 are the ends on the 3000GT).
+ * shortcut: a start byte far outside the box (hand-edited save) is not checked against the game.
+ * @returns the setup after the key, or null when the key changes nothing or the final drive is locked.
+ */
+export function pressFinalDrive(model: DynoModel, setup: ArrayLike<number>, dir: 1 | -1): Uint8Array | null {
+  const row = model.gearing(setup)?.rows.find((r) => r.param === FD_BYTE);
+  if (!row) return null;
+  const min = f(row.min), max = f(row.max), def = f(row.stock);
+  const t = Math.max(-1, Math.min(1, f(f(setup[FD_BYTE] - 100) * f(0.01))));
+  // the screen shows the value on the absolute scale (FUN_00401790 clamps to it), a hair wider than the box
+  const [absMin, absMax] = model.absoluteRange(setup, FD_BYTE).map(f);
+  const v = clamp32(f(f(f(max - min) * f(t)) + def), absMin, absMax);
+  const step = f(f(max - min) * f(1 / 30));
+  const nv = dir > 0 ? Math.min(f(v + step), max) : Math.max(f(v - step), min);
+  if (f(nv) === f(v)) return null;
+  const out = Uint8Array.from(setup);
+  out[FD_BYTE] = encodeGearByte(nv, def, min, max);
+  return out;
 }
