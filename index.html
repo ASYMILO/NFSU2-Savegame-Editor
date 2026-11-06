@@ -50,6 +50,9 @@
           <span class="hand-mode-note">No save needed. Choose the car and its parts.</span>
         </label>
       </div>
+      <div class="tuner-logo" ng-if="tunerLogo()">
+        <img ng-src="./game/logos/{{ tunerLogo() }}.png" alt="{{ tunerLogo() }}" onload="this.parentNode.hidden=false" onerror="this.parentNode.hidden=true">
+      </div>
       <div ng-if="tuner.source === 'save'">
         <div class="editor-row">
           <label class="profile-action-btn dyno-file">
@@ -70,13 +73,19 @@
         </div>
         <p class="message" ng-class="status.type" ng-if="status.text" role="status">{{ status.text }}</p>
       </div>
-      <div class="dyno-controls tuner-list" ng-if="tuner.source === 'list'">
-        <label>Car
-          <select ng-model="tuner.carHash" ng-options="c.hash as c.name for c in tuner.cars" ng-change="tunerChanged()" ng-disabled="!tuner.cars.length"></select>
-        </label>
-        <label ng-repeat="level in tuner.levels track by level.code">{{ level.label }}
-          <select ng-model="level.value" ng-options="o.value as o.label for o in level.options" ng-change="tunerChanged()"></select>
-        </label>
+      <div ng-if="tuner.source === 'list'">
+        <div class="dyno-controls tuner-list">
+          <label>Car
+            <select ng-model="tuner.carHash" ng-options="c.hash as c.name for c in tuner.cars" ng-change="tunerChanged()" ng-disabled="!tuner.cars.length"></select>
+          </label>
+        </div>
+        <p class="muted">Pick the parts your car has. A part opens a tuning screen in the game; without it the screen stays locked.</p>
+        <div class="tuner-parts">
+          <label ng-repeat="level in tuner.levels track by level.code">{{ level.label }}
+            <select ng-model="level.value" ng-options="o.value as o.label for o in level.options" ng-change="tunerChanged()"></select>
+            <small>{{ level.hint }}</small>
+          </label>
+        </div>
       </div>
     </section>
 
@@ -102,51 +111,64 @@
     <section class="profile-section" ng-if="tuner.cards.length">
       <h3>3. Set it in the game: {{ tuner.carName }}</h3>
       <p class="message error" ng-if="tuner.stale">You changed the car, parts or preferences. Press Optimize again.</p>
-      <p class="muted">The game has one tuning tab per race type. Pick the tab on the Performance Tuning screen, then do the steps from top to bottom.
-        <span ng-if="tuner.fromC">No save: press C first where it says C. Then the game starts from the same values as here.</span>
-        <span ng-if="!tuner.fromC">The steps start from the values in your save.</span></p>
-      <div class="dyno-setups" role="tablist" aria-label="Game tabs">
-        <button type="button" role="tab" ng-repeat="card in tuner.cards track by card.title" ng-class="{ active: tuner.card === $index }"
-                ng-attr-aria-selected="{{ tuner.card === $index ? 'true' : 'false' }}" ng-click="tuner.card = $index">{{ card.title }}</button>
+      <p class="muted">The game keeps one setup per tab. Pick the same tab on the game's Performance Tuning screen, then go through the screens below from top to bottom.</p>
+      <p class="tuner-reset"><strong>Reset (key C)</strong> is the game's “Reset to default”. On a slider screen it resets only the row you are on. On ECU and Turbo it resets all 9 bars.
+        <span ng-if="tuner.fromC">No save: we do not know where your sliders stand, so every step starts with Reset.</span></p>
+      <div class="dyno-setups tuner-tabs" role="tablist" aria-label="Game tabs">
+        <button type="button" role="tab" ng-repeat="tab in tuner.tabs track by tab.name" ng-class="{ active: tuner.card === tab.card }"
+                ng-attr-aria-selected="{{ tuner.card === tab.card ? 'true' : 'false' }}" ng-click="tuner.card = tab.card">
+          <strong>{{ tab.name }}</strong><small>{{ tab.short }}</small>
+        </button>
       </div>
       <article class="hand-card tuner-card" ng-repeat="card in tuner.cards track by card.title" ng-if="tuner.card === $index">
         <h3>{{ card.title }}</h3>
-        <p class="tuner-uses" ng-repeat="u in card.uses track by $index">{{ u }}</p>
-        <p class="tuner-same" ng-if="card.setups.length > 1">Same plan for these tabs: set each of them the same way.</p>
-        <div class="hand-tiles">
-          <div class="hand-tile" ng-repeat="tile in card.tiles track by tile.label">
-            <span class="hand-tile-label">{{ tile.label }}</span>
-            <span class="hand-tile-main pick">{{ tile.value }}</span>
-          </div>
-        </div>
+        <table class="tuner-uses">
+          <thead><tr><th ng-if="card.uses.length > 1">Tab</th><th>Career races</th><th>Quick Race</th></tr></thead>
+          <tbody><tr ng-repeat="u in card.uses track by u.tab"><th scope="row" ng-if="card.uses.length > 1">{{ u.tab }}</th><td>{{ u.career }}</td><td>{{ u.quick }}</td></tr></tbody>
+        </table>
+        <p class="tuner-same" ng-if="card.setups.length > 1">Same plan for the tabs {{ card.title }}: set each of them the same way.</p>
+        <table class="tuner-compare">
+          <thead><tr><th>Dyno</th><th>{{ card.nowLabel }}</th><th>After the steps</th></tr></thead>
+          <tbody><tr ng-repeat="row in card.compare track by row.label"><th scope="row">{{ row.label }}</th><td>{{ row.now }}</td><td><strong>{{ row.after }}</strong></td></tr></tbody>
+        </table>
         <p class="muted">{{ card.bLine }}</p>
         <p class="muted" ng-if="card.note">{{ card.note }}</p>
-        <p ng-if="!card.steps.length">Nothing to change. Your tuning is already the best found.</p>
-        <div class="tuner-step" ng-repeat="step in card.steps track by $index">
-          <p><strong>{{ step.screen }}</strong> · {{ step.row }}: <span class="hand-keys">{{ step.keys }}</span>
-            <span ng-if="step.shows">→ shows <strong>{{ step.shows }}</strong></span></p>
-          <svg class="dyno-graph" role="img" ng-if="step.chart" ng-attr-view_box="0 0 {{ step.chart.width }} {{ step.chart.height }}"
-               aria-label="{{ step.screen }} graph with the presses under each bar">
-            <g class="dyno-grid">
-              <line ng-repeat="tick in step.chart.ticks track by $index"
-                    ng-attr-x1="{{ step.chart.left }}" ng-attr-x2="{{ step.chart.width - 8 }}" ng-attr-y1="{{ tick.y }}" ng-attr-y2="{{ tick.y }}"></line>
-              <text ng-repeat="tick in step.chart.ticks track by $index" class="dyno-axis"
-                    ng-attr-x="{{ step.chart.left - 6 }}" ng-attr-y="{{ tick.y + 4 }}" text-anchor="end">{{ tick.label }}</text>
-            </g>
-            <g ng-repeat="col in step.chart.columns track by col.index" class="dyno-col">
-              <rect class="dyno-range" ng-attr-x="{{ col.x + 3 }}" ng-attr-y="{{ col.rangeY }}" ng-attr-width="{{ col.width - 6 }}" ng-attr-height="{{ col.rangeH }}"></rect>
-              <rect class="dyno-value-bar" ng-attr-x="{{ col.x + 3 }}" ng-attr-y="{{ col.valueY }}" ng-attr-width="{{ col.width - 6 }}" ng-attr-height="{{ col.valueH }}"></rect>
-              <line class="dyno-stock" ng-attr-x1="{{ col.x + 3 }}" ng-attr-x2="{{ col.x + col.width - 3 }}" ng-attr-y1="{{ col.stockY }}" ng-attr-y2="{{ col.stockY }}"></line>
-              <circle class="dyno-dot" ng-attr-cx="{{ col.x + col.width / 2 }}" ng-attr-cy="{{ col.valueY }}" r="5"></circle>
-              <text class="dyno-axis" ng-attr-x="{{ col.x + col.width / 2 }}" ng-attr-y="{{ step.chart.bottom + 16 }}" text-anchor="middle">{{ col.rpmLabel }}</text>
-              <text class="dyno-press" ng-repeat="press in col.presses track by $index" ng-attr-x="{{ col.x + col.width / 2 }}"
-                    ng-attr-y="{{ step.chart.bottom + 32 + $index * 14 }}" text-anchor="middle">{{ press }}</text>
-            </g>
-            <text class="dyno-axis" ng-repeat="label in step.chart.passLabels track by $index" x="2" ng-attr-y="{{ step.chart.bottom + 32 + $index * 14 }}">{{ label }}</text>
-            <text class="dyno-axis" ng-attr-x="{{ step.chart.width - 8 }}" ng-attr-y="{{ step.chart.height - 4 }}" text-anchor="end">RPM</text>
-          </svg>
-          <p class="muted" ng-if="step.chart">▲3 = UP 3 times on that bar, ▼2 = DOWN 2 times. Do the first row of numbers on all bars, left to right, then the next row.</p>
+        <div class="tuner-screen" ng-repeat="scr in card.screens track by scr.name" ng-class="scr.state">
+          <p class="tuner-screen-head"><strong>{{ scr.name }}</strong>
+            <span class="tuner-badge">{{ scr.badge }}</span>
+            <span class="muted" ng-if="scr.text">{{ scr.text }}</span></p>
+          <div class="tuner-step" ng-repeat="step in scr.steps track by $index">
+            <p>{{ step.row }}<span ng-if="step.shows">: <span class="muted" ng-if="step.from && step.from !== step.shows">{{ step.from }} → </span><strong>{{ step.shows }}</strong></span>.
+              Keys: <span class="hand-keys">{{ step.keys }}</span></p>
+            <svg class="dyno-graph" role="img" ng-if="step.chart" ng-attr-view_box="0 0 {{ step.chart.width }} {{ step.chart.height + 16 }}"
+                 aria-label="{{ step.screen }} graph with the presses under each bar">
+              <g class="dyno-grid">
+                <line ng-repeat="tick in step.chart.ticks track by $index"
+                      ng-attr-x1="{{ step.chart.left }}" ng-attr-x2="{{ step.chart.width - 8 }}" ng-attr-y1="{{ tick.y }}" ng-attr-y2="{{ tick.y }}"></line>
+                <text ng-repeat="tick in step.chart.ticks track by $index" class="dyno-axis"
+                      ng-attr-x="{{ step.chart.left - 6 }}" ng-attr-y="{{ tick.y + 4 }}" text-anchor="end">{{ tick.label }}</text>
+              </g>
+              <g ng-repeat="col in step.chart.columns track by col.index" class="dyno-col">
+                <rect class="dyno-range" ng-attr-x="{{ col.x + 3 }}" ng-attr-y="{{ col.rangeY }}" ng-attr-width="{{ col.width - 6 }}" ng-attr-height="{{ col.rangeH }}"></rect>
+                <rect class="dyno-value-bar" ng-attr-x="{{ col.x + 3 }}" ng-attr-y="{{ col.valueY }}" ng-attr-width="{{ col.width - 6 }}" ng-attr-height="{{ col.valueH }}"></rect>
+                <line class="dyno-stock" ng-attr-x1="{{ col.x + 3 }}" ng-attr-x2="{{ col.x + col.width - 3 }}" ng-attr-y1="{{ col.stockY }}" ng-attr-y2="{{ col.stockY }}"></line>
+                <circle class="dyno-dot" ng-attr-cx="{{ col.x + col.width / 2 }}" ng-attr-cy="{{ col.valueY }}" r="5"></circle>
+                <text class="dyno-press" ng-attr-x="{{ col.x + col.width / 2 }}" ng-attr-y="{{ step.chart.bottom + 16 }}" text-anchor="middle">Bar {{ col.index + 1 }}</text>
+                <text class="dyno-axis" ng-attr-x="{{ col.x + col.width / 2 }}" ng-attr-y="{{ step.chart.bottom + 30 }}" text-anchor="middle">{{ col.rpmLabel }}</text>
+                <text class="dyno-press" ng-repeat="press in col.presses track by $index" ng-attr-x="{{ col.x + col.width / 2 }}"
+                      ng-attr-y="{{ step.chart.bottom + 48 + $index * 14 }}" text-anchor="middle">{{ press }}</text>
+              </g>
+              <text class="dyno-axis" ng-repeat="label in step.chart.passLabels track by $index" x="2" ng-attr-y="{{ step.chart.bottom + 48 + $index * 14 }}">{{ label }}</text>
+              <text class="dyno-axis" x="2" ng-attr-y="{{ step.chart.bottom + 30 }}">RPM</text>
+            </svg>
+            <ol class="tuner-howto" ng-if="step.chart">
+              <li>Press Reset (key C). All 9 bars go back to default and bar 1 (left) is picked.</li>
+              <li>1st round: on each bar press UP or DOWN as many times as it says (– = none), then RIGHT to the next bar.</li>
+              <li ng-if="step.chart.passLabels.length > 1">After bar 9 press LEFT 8 times to get back to bar 1. Do the 2nd round the same way{{ step.chart.passLabels.length > 2 ? ', then the 3rd' : '' }}.</li>
+            </ol>
+          </div>
         </div>
+        <p class="muted">Leave as is: Optimize tunes only Drivetrain, ECU and Turbo. The dyno measures speed, not grip or handling.</p>
         <div class="editor-row" ng-if="tuner.canWrite">
           <button type="button" class="profile-action-btn" ng-click="tunerWrite(card)" ng-disabled="tuner.stale || card.written">{{ card.written ? 'Written to save' : 'Write exact setup to save' }}</button>
           <span class="muted">Writes the exact numbers, not the key result.</span>

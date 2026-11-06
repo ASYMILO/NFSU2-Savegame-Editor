@@ -224,14 +224,20 @@ export interface VirtualView {
 /** One card of the Tuner screen: one game tab, or several with the same plan. */
 export interface TunerCardView {
   setups: number[];
+  /** The game's tab names, joined. */
   title: string;
-  uses: string[];
-  /** Mode A on the dyno screen: 0-60, 0-100, top speed, power. */
-  tiles: { label: string; value: string }[];
+  uses: { tab: string; career: string; quick: string }[];
+  /** Dyno numbers before (save, or after the reset) and after mode A. */
+  nowLabel: string;
+  compare: { label: string; now: string; after: string }[];
   /** Mode B in one line, with A minus B. */
   bLine: string;
   presses: number;
-  steps: { screen: string; row: string; keys: string; shows: string; presses: number; chart?: CurveChart }[];
+  /** Every screen of the game's menu, in its order. */
+  screens: {
+    name: string; state: 'set' | 'ok' | 'keep' | 'locked'; badge: string; text: string;
+    steps: { screen: string; row: string; keys: string; shows: string; from?: string; presses: number; chart?: CurveChart }[];
+  }[];
   note: string;
   table: HandRow[];
   sheet: string;
@@ -245,7 +251,8 @@ export interface TunerView {
   slot: number | null;
   cars: { hash: number; name: string }[];
   carHash: number;
-  levels: VirtualView['levels'];
+  /** Part levels; `hint` says which screen of the game the part opens. */
+  levels: (VirtualView['levels'][number] & { hint: string })[];
   pref: string;
   prefs: { key: string; label: string; text: string }[];
   busy: boolean;
@@ -258,6 +265,8 @@ export interface TunerView {
   canWrite: boolean;
   written: boolean;
   cards: TunerCardView[];
+  /** The game's five tabs in its order and the card each one opens. */
+  tabs: { name: string; short: string; card: number }[];
   /** The card on show (one game tab at a time). */
   card: number;
 }
@@ -379,4 +388,5 @@ export interface EditorScope extends angular.IScope {
   tunerChanged(): void;
   tunerOptimize(): void;
   tunerWrite(card: TunerCardView): void;
+  tunerLogo(): string;
 }

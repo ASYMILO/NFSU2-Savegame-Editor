@@ -5,7 +5,11 @@ import { DynoModel, findCar, parseGameData, type CurveKind } from '../model/dyno
 import { defaultSetup } from '../model/legal-opt.js';
 import type { SliderPlan } from '../model/hand-input.js';
 import { CurveScreen, NitroScreen, openRow, pressFinalDrive, pressRowState, resetRow, rowInfo } from '../model/tune-keys.js';
-import { groupTabs, legalOptions, menuOrder, planTab, SCREEN_ORDER, startAfterC, tunerSteps, type TabResult } from '../model/tuner.js';
+import {
+  categoryScreens, groupTabs, legalOptions, menuOrder, planTab, SCREEN_ORDER, screenPlans, startAfterC, tunerSteps, unlockParts, type TabResult,
+} from '../model/tuner.js';
+import { PERF_PARTS } from '../data/perf-parts.js';
+import { installedForLevels, withAero } from '../model/virtual-save.js';
 
 const GAME_BUN = process.env.NFSU2_GLOBALB ?? 'C:/Program Files (x86)/EA GAMES/Need for Speed Underground 2/GLOBAL/GLOBALB.BUN';
 const SKIP = !existsSync(GAME_BUN) && 'GLOBALB.BUN (set NFSU2_GLOBALB) missing';
@@ -96,8 +100,37 @@ test('no save: every step starts with C, and every curve and drivetrain row Opti
     // key C on a row of the start changes nothing: the start is the state after C
     for (const param of model.gearingParameters) assert.deepEqual(Array.from(resetRow(model, start, param).setup), Array.from(start), `${car.name}: row ${param}`);
     const steps = tunerSteps(model, planTab(model, 0, start, target(model, start), 'race'), true);
-    for (const s of steps) assert.match(s.keys, /^C/, `${car.name}: ${s.screen} ${s.row}`);
+    for (const s of steps) assert.match(s.keys, /^Reset \(key C\)/, `${car.name}: ${s.screen} ${s.row}`);
     const curves = (['ecu', 'turbo'] as const).filter((k) => model.curve(start, k)).length;
     assert.ok(steps.length >= curves + model.gearingParameters.filter((p) => rowInfo(model, start, p)).length, `${car.name}: rows missing`);
   }
+});
+
+test('which part opens which screen comes from the game\'s tuning records', { skip: SKIP }, () => {
+  const game = parseGameData(new Uint8Array(readFileSync(GAME_BUN)));
+  assert.deepEqual(unlockParts(game, [0, 1, 2, 3, 4, 5, 6, 7, 8]), ['Sport Springs And Shocks (Street)', 'Strut Tower Bar (Street)', 'Camber Kit (Pro)']);
+  assert.deepEqual(unlockParts(game, [21, 22]), ['Front Bumper L1', 'Spoiler L1']);
+  assert.deepEqual(categoryScreens(game, 'BR'), ['Tires & Brakes']);
+  assert.deepEqual(categoryScreens(game, 'TR'), ['Drivetrain']);
+  assert.deepEqual(categoryScreens(game, 'EN'), []);
+  assert.deepEqual(categoryScreens(game, 'WT'), []);
+});
+
+test('a card lists every screen in menu order; screens without a part are locked', { skip: SKIP }, () => {
+  const game = parseGameData(new Uint8Array(readFileSync(GAME_BUN)));
+  const car = game.cars.find((c) => c.name === '3000GT')!;
+  const model = new DynoModel(game, car, installedForLevels({ EC: 2 }), new Array(9).fill(0));
+  const start = startAfterC(model);
+  const plans = screenPlans(model, [2], tunerSteps(model, planTab(model, 2, start, target(model, start), 'race'), true));
+  assert.deepEqual(plans.map((p) => p.name), SCREEN_ORDER);
+  assert.equal(plans.find((p) => p.name === 'ECU')!.state, 'set');
+  for (const name of ['Suspension', 'Drivetrain', 'Aerodynamics', 'Tires & Brakes', 'Turbo', 'Nitrous']) {
+    assert.equal(plans.find((p) => p.name === name)!.state, 'locked', name);
+  }
+});
+
+test('aero levels set one front bumper and one spoiler flag', () => {
+  const on = withAero(new Array(68).fill(false), { AEF: 2, AES: 3 });
+  assert.deepEqual(on.flatMap((b, i) => (b ? [PERF_PARTS[i].key] : [])), ['AE_FRONT_BUMPER_L2', 'AE_SPOILER_L3']);
+  assert.ok(!withAero(on, { AEF: 0, AES: 0 }).some(Boolean));
 });

@@ -7,13 +7,14 @@ import { DynoModel, findCar, readSlotDyno, setSetupTuning, type GameData } from 
 import { getCarTypeHash, slotState } from '../model/slots.js';
 import { slotCount } from '../model/layout.js';
 import { TRAFFIC_CARS } from '../data/traffic-cars.js';
-import { buildVirtualSave, installedForLevels, PART_LEVEL_CATEGORIES } from '../model/virtual-save.js';
+import { AERO_PARTS, buildVirtualSave, installedForLevels, PART_LEVEL_CATEGORIES, withAero } from '../model/virtual-save.js';
+import { gameNumbers } from '../model/legal-opt.js';
 import {
-  groupTabs, optimizeTab, planTab, PREFERENCES, SETUP_COUNT, SETUP_NAMES, startAfterC, TAB_USES, tunerSteps,
-  type Preference, type TabResult,
+  categoryScreens, groupTabs, optimizeTab, planTab, PREFERENCES, screenPlans, SETUP_COUNT, startAfterC, TAB_NAMES, TAB_USES,
+  tunerSteps, type Preference, type TabResult,
 } from '../model/tuner.js';
 import { curveChart } from './editor-controller.js';
-import type { EditorScope, HandRow, TunerCardView } from './editor-scope.js';
+import type { CurveChart, EditorScope, HandRow, TunerCardView } from './editor-scope.js';
 
 export interface TunerApi {
   /** The loaded save (null without one, or in the editor's own no-save mode). */
@@ -33,12 +34,18 @@ export function attachTuner($scope: EditorScope, api: TunerApi): () => void {
   $scope.view = 'tuner';
   $scope.tuner = {
     source: 'save', slots: [], slot: null, cars: [], carHash: 0,
-    levels: PART_LEVEL_CATEGORIES.map((c) => ({
-      code: c.code, label: c.label, value: 0,
-      options: [{ value: 0, label: 'None' }, ...[1, 2, 3].filter((l) => l <= c.maxLevel).map((l) => ({ value: l, label: ['Street', 'Pro', 'Extreme'][l - 1] }))],
-    })),
+    levels: [
+      ...PART_LEVEL_CATEGORIES.map((c) => ({
+        code: c.code, label: c.label, value: 0, hint: '',
+        options: [{ value: 0, label: 'None' }, ...[1, 2, 3].filter((l) => l <= c.maxLevel).map((l) => ({ value: l, label: ['Street', 'Pro', 'Extreme'][l - 1] }))],
+      })),
+      ...AERO_PARTS.map((a) => ({
+        code: a.code, label: a.label, value: 0, hint: '',
+        options: [{ value: 0, label: 'None' }, ...[1, 2, 3].map((l) => ({ value: l, label: `Level ${l}` }))],
+      })),
+    ],
     pref: 'race', prefs: PREFERENCES, busy: false, progress: '', error: '', stale: false, carName: '', fromC: true,
-    canWrite: false, written: false, cards: [], card: 0,
+    canWrite: false, written: false, cards: [], tabs: [], card: 0,
   };
   const t = $scope.tuner;
   let results: TabResult[] = [];
@@ -50,6 +57,7 @@ export function attachTuner($scope: EditorScope, api: TunerApi): () => void {
 
   function refreshLists(): void {
     const game = api.game(), save = api.save();
+    if (game) for (const level of t.levels) level.hint = partHint(game, level.code);
     t.cars = game ? game.cars.filter((c) => !TRAFFIC_CARS.some((x) => x.hash === c.hash)).map((c) => ({ hash: c.hash, name: c.name })) : [];
     if (!t.cars.some((c) => c.hash === t.carHash)) t.carHash = (t.cars.find((c) => c.name === '3000GT') ?? t.cars[0])?.hash ?? 0;
     t.slots = [];
@@ -81,7 +89,7 @@ export function attachTuner($scope: EditorScope, api: TunerApi): () => void {
   function clear(): void {
     runToken++;
     results = [];
-    t.cards = []; t.card = 0; t.busy = false; t.progress = ''; t.error = ''; t.stale = false; t.written = false;
+    t.cards = []; t.tabs = []; t.card = 0; t.busy = false; t.progress = ''; t.error = ''; t.stale = false; t.written = false;
   }
 
   $scope.tunerChanged = function (): void {
@@ -100,7 +108,8 @@ export function attachTuner($scope: EditorScope, api: TunerApi): () => void {
       fromC = false;
     } else {
       if (!t.carHash) return 'Pick a car.';
-      sd = readSlotDyno(buildVirtualSave(t.carHash, installedForLevels(Object.fromEntries(t.levels.map((l) => [l.code, l.value])))), 0);
+      const levels = Object.fromEntries(t.levels.map((l) => [l.code, l.value]));
+      sd = readSlotDyno(buildVirtualSave(t.carHash, withAero(installedForLevels(levels), levels)), 0);
       fromC = true;
     }
     const car = findCar(game, sd.hash);
@@ -144,7 +153,7 @@ export function attachTuner($scope: EditorScope, api: TunerApi): () => void {
     t.progress = `Working on 5 tabs… 0 of 5 done. About 20 s per tab.`;
     const finish = (setup: number, out: { bytes: number[]; sheet: string } | { error: string }): void => {
       if (token !== runToken) return;
-      if ('error' in out) { t.error = `${SETUP_NAMES[setup]}: ${out.error}`; t.busy = false; runToken++; return; }
+      if ('error' in out) { t.error = `${TAB_NAMES[setup]}: ${out.error}`; t.busy = false; runToken++; return; }
       results[setup] = planTab(src.model, setup, src.starts[setup], Uint8Array.from(out.bytes), pref, out.sheet);
       done++;
       t.progress = `Working on 5 tabs… ${done} of 5 done.`;
@@ -153,6 +162,8 @@ export function attachTuner($scope: EditorScope, api: TunerApi): () => void {
         t.progress = '';
         resultSave = save;
         t.cards = cards(src, results);
+        // the game's five tabs in its order; tabs with the same plan open the same card
+        t.tabs = TAB_NAMES.map((name, setup) => ({ name, short: TAB_USES[setup].short, card: t.cards.findIndex((c) => c.setups.includes(setup)) }));
       }
     };
     const job = (setup: number) => ({
@@ -205,8 +216,39 @@ export function attachTuner($scope: EditorScope, api: TunerApi): () => void {
     t.written = true;
   };
 
+  /** Car record name of the chosen car (for its logo, ./game/logos/<name>.png), or '' when none. */
+  $scope.tunerLogo = function (): string {
+    const game = api.game(), save = api.save();
+    if (!game) return '';
+    const hash = t.source === 'save' ? (save && t.slot !== null ? getCarTypeHash(save, t.slot) : 0) : t.carHash;
+    return (hash && findCar(game, hash)?.name) || '';
+  };
+
   sync();
   return sync;
+}
+
+/** What a part category opens in the game, from the game's tuning records. */
+function partHint(game: GameData, code: string): string {
+  const aero = AERO_PARTS.find((a) => a.code === code);
+  if (aero) return `Opens Aerodynamics (${code === 'AEF' ? 'front' : 'rear'} downforce) in the game.`;
+  const screens = categoryScreens(game, code);
+  if (!screens.length) return 'Counts on the dyno. Opens no tuning screen in the game.';
+  // gears 10-15 have a record only for the 6-speed transmission (L3), final drive for every level
+  const extra = code === 'TR' ? ' Gears only with Extreme (6-speed); Street and Pro: final drive.' : '';
+  return `Opens ${screens.join(', ')} in the game.${extra}`;
+}
+
+const BADGES = { set: 'Change', ok: 'Leave as is', keep: 'Leave as is', locked: 'Locked' } as const;
+
+/** The chart's presses in words ("UP 3", "DOWN 1", "–") and its rows as rounds. Order as planHandInput: bar 1 to 9, round by round. */
+function pressWords(chart: CurveChart): CurveChart {
+  const word = (p: string): string => (p.startsWith('▲') ? `UP ${p.slice(1)}` : p.startsWith('▼') ? `DOWN ${p.slice(1)}` : '–');
+  return {
+    ...chart,
+    columns: chart.columns.map((c) => ({ ...c, presses: c.presses.map(word) })),
+    passLabels: chart.passLabels.map((_, k) => ['1st', '2nd', '3rd'][k] ?? `${k + 1}th`),
+  };
 }
 
 function cards(src: Source, results: TabResult[]): TunerCardView[] {
@@ -214,7 +256,11 @@ function cards(src: Source, results: TabResult[]): TunerCardView[] {
   const sign = (v: number | null, unit: string, digits: number): string => (v === null ? '–' : `${v > 0 ? '+' : ''}${v.toFixed(digits)} ${unit}`);
   return groupTabs(results).map((group): TunerCardView => {
     const r = group[0], { a, b, diff } = r.plan;
-    const names = group.map((x) => SETUP_NAMES[x.setup]);
+    const names = group.map((x) => TAB_NAMES[x.setup]);
+    const now = gameNumbers(src.model.evaluate(r.start));
+    const kmh = (v: number): string => `${v.toFixed(1)} km/h`, bhp = (v: number): string => `${v.toFixed(1)} bhp`;
+    const steps = tunerSteps(src.model, r, src.fromC).map((s) => (s.curve && s.passes?.length
+      ? { ...s, chart: pressWords(curveChart(src.model.curve(r.plan.setup, s.curve)!, 0, s.passes)) } : s));
     const table: HandRow[] = [
       { label: '0–60 mph', a: sec(a.t60), b: sec(b.t60), diff: sign(diff.t60, 's', 2), zero: diff.t60 === null || Math.abs(diff.t60) < 0.005 },
       { label: '0–100 mph', a: sec(a.t100), b: sec(b.t100), diff: sign(diff.t100, 's', 2), zero: diff.t100 === null || Math.abs(diff.t100) < 0.005 },
@@ -224,14 +270,19 @@ function cards(src: Source, results: TabResult[]): TunerCardView[] {
     const same = table.every((row) => row.zero);
     return {
       setups: group.map((x) => x.setup),
-      title: names.length > 1 ? `${names.join(' + ')} tabs` : `${names[0]} tab`,
-      uses: group.map((x) => (group.length > 1 ? `${SETUP_NAMES[x.setup]}: ` : '') + TAB_USES[x.setup]),
-      tiles: table.map((row) => ({ label: row.label, value: row.a })),
+      title: names.join(' + '),
+      uses: group.map((x) => ({ tab: TAB_NAMES[x.setup], career: TAB_USES[x.setup].career, quick: TAB_USES[x.setup].quick })),
+      nowLabel: src.fromC ? 'After reset' : 'Now (save)',
+      compare: [
+        { label: '0–60 mph', now: sec(now.t60), after: sec(a.t60) },
+        { label: '0–100 mph', now: sec(now.t100), after: sec(a.t100) },
+        { label: 'Top speed', now: kmh(now.topKmh), after: kmh(a.topKmh) },
+        { label: 'Power', now: bhp(now.powerBhp), after: bhp(a.powerBhp) },
+      ],
       bLine: same ? 'Writing to the save gives the same numbers.'
         : `Writing to the save would give ${table.map((row) => row.b).join(' · ')} (by hand minus save: ${table.map((row) => row.diff).join(' · ')}).`,
       presses: r.plan.presses,
-      steps: tunerSteps(src.model, r, src.fromC).map((s) => (s.curve && s.passes?.length
-        ? { ...s, chart: curveChart(src.model.curve(r.plan.setup, s.curve)!, 0, s.passes) } : s)),
+      screens: screenPlans(src.model, group.map((x) => x.setup), steps).map((x) => ({ ...x, badge: BADGES[x.state] })),
       note: group.some((x) => x.setup === 1) ? 'In Drag races you shift by hand. The dyno shifts by itself.' : '',
       table,
       sheet: `${r.handSheet}\n\n${r.legalSheet}`,

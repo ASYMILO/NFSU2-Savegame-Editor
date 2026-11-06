@@ -497,3 +497,23 @@ body {
 .tuner-step p { margin: 0 0 6px; }
 .tuner-step .hand-keys { min-width: 0; }
 .tuner-card .dyno-graph { max-width: 560px; }
+.tuner-parts { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px 14px; margin-top: 6px; }
+.tuner-parts label { display: flex; flex-direction: column; gap: 3px; font-size: 13px; color: var(--color-text-muted); }
+.tuner-parts small { font-size: 11px; color: var(--color-text-muted); }
+.tuner-logo { width: fit-content; margin-top: 10px; padding: 6px 12px; border-radius: 8px; background: var(--color-bg); border: 1px solid var(--color-border); }
+.tuner-logo img { display: block; width: 192px; height: 48px; }
+.tuner-reset { margin: 0; padding: 8px 12px; border-left: 3px solid var(--color-primary); background: var(--color-elevated); color: var(--color-text); font-size: 13px; }
+.tuner-tabs button { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; padding: 6px 14px; }
+.tuner-tabs small { font-size: 11px; color: var(--color-text-muted); }
+.tuner-uses, .tuner-compare { border-collapse: collapse; font-size: 13px; font-variant-numeric: tabular-nums; }
+.tuner-uses th, .tuner-uses td, .tuner-compare th, .tuner-compare td { padding: 3px 14px 3px 0; text-align: left; border-bottom: 1px solid var(--color-border); }
+.tuner-uses thead th, .tuner-compare thead th { font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--color-text-muted); font-weight: 600; }
+.tuner-compare td strong { color: var(--color-text-strong); }
+.tuner-screen { padding: 8px 0 4px; border-top: 1px solid var(--color-border); }
+.tuner-screen-head { margin: 0 0 4px; display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: baseline; }
+.tuner-badge { font-size: 11px; padding: 1px 8px; border-radius: 10px; border: 1px solid var(--color-border); color: var(--color-text-muted); }
+.tuner-screen.set .tuner-badge { border-color: var(--color-primary); color: var(--color-text-strong); }
+.tuner-screen.locked .tuner-badge { border-color: var(--color-warning); color: var(--color-warning); }
+.tuner-screen.keep, .tuner-screen.ok, .tuner-screen.locked { font-size: 13px; }
+.tuner-screen .tuner-step { border-top: 0; padding: 2px 0 6px 12px; }
+.tuner-howto { margin: 4px 0 0; padding-left: 20px; font-size: 13px; color: var(--color-text); }

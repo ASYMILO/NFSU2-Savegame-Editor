@@ -35,6 +35,27 @@ export function installedForLevels(levels: Record<string, number>): boolean[] {
   return on.slice(0, 68);
 }
 
+/**
+ * Aero parts (not in the shop categories above): the game opens Aerodynamics with a front bumper (front downforce) or a
+ * spoiler (rear downforce), levels 1..3 (docs/setup-bytes.md l.38-39 of the tuner repo). Their flags exclude each other.
+ */
+export const AERO_PARTS = [
+  { code: 'AEF', label: 'Front bumper (aero)', key: 'AE_FRONT_BUMPER_L' },
+  { code: 'AES', label: 'Spoiler (aero)', key: 'AE_SPOILER_L' },
+];
+
+/** `installed` with the aero flag of each chosen level (0 = none) set. */
+export function withAero(installed: boolean[], levels: Record<string, number>): boolean[] {
+  const on = installed.slice();
+  for (const a of AERO_PARTS) {
+    for (let l = 1; l <= 3; l++) {
+      const i = PERF_PARTS.findIndex((p) => p.key === `${a.key}${l}`);
+      if (i >= 0 && i < on.length) on[i] = (levels[a.code] ?? 0) === l;
+    }
+  }
+  return on;
+}
+
 /** A 54,966-byte career save, valid for the editor's checks, with one bought car in slot 1 and neutral dyno setups. */
 export function buildVirtualSave(carHash: number, installed: boolean[]): Uint8Array {
   const data = new Uint8Array(PROFILE_SIZE);

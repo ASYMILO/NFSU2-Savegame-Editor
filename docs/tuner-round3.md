@@ -112,7 +112,55 @@ Screens (`docs/img/`): ![save loaded](img/r3-1-save-loaded.png) ![pick a car](im
   The `serve_editors.sh` on `dev` is still the old one (plain `http.server`, page asks for the file) until that branch is merged.
 - Merging of equal tabs: unit test only. Browsers other than Brave, phone widths: not tried.
 
+## 3c. Owner's feedback, round 3c (branch `feat/tuner-r3c` off `feat/tuner-r3`)
+
+Feedback: key C unclear, the ▲/▼ rows unclear, no before/after, Engine / Nitrous / Suspension / Brakes "None" with no
+settings, "Circuit Tab" suffix not needed, career vs Quick Race must be clear, tabs and order as in the game, car thumbnails.
+
+| Feedback | Done | Source |
+|---|---|---|
+| C = reset? | Every key C reads **Reset (key C)**. One box on top: it is the game's "Reset to default"; on a slider screen it resets only the selected row, on ECU and Turbo all 9 bars. | `docs/native-menu-map.md` l.174-181 (measured) |
+| ▲/▼ rows | Under each bar: **Bar 1..9**, the rpm, then per round **UP 3 / DOWN 1 / –** in words; rows named 1st, 2nd, 3rd. Three numbered lines under the chart: Reset (bar 1 is picked), UP/DOWN then RIGHT to the next bar, after bar 9 LEFT ×8 back to bar 1 for the next round. | Order = `curvePlanner` in `src/model/hand-input.ts` (C, then bars 0..8 per pass); the key list that passed the in-game check does exactly this: `native/runs/dyno_check_20261106/steps_a.mjs` l.24-27 (LEFT ×8 between rounds, RIGHT after each bar) |
+| Before / after | Table "Dyno: Now (save) → After the steps" (0-60, 0-100, top speed, power). Without a save the first column is "After reset". Slider steps read "Final Drive Ratio: 4.05 → 3.96. Keys: Reset (key C)". | Numbers: `gameNumbers(model.evaluate(start))` and the plan's mode A; slider numbers: `shownText` on the start and on the plan, no new numbers |
+| Parts "None" | **Every card lists all 7 screens of the game's menu.** A screen without a part: **Locked**, with the parts that open it. A screen Optimize does not tune: **Leave as is**, one line at the end: Optimize tunes only Drivetrain, ECU and Turbo, the dyno measures speed, not grip or handling (checked: on the owner's 3000GT Optimize changes only byte 9 and bytes 23-40). Drift and Street X: "This race type turns nitrous off anyway". | Locked / which part: the game's tuning records in GLOBALB.BUN (`unlockParts`, `categoryScreens` in `src/model/tuner.ts`; rule `docs/setup-bytes.md` l.42); nitrous: `docs/setup-bytes.md` l.103 |
+| Parts list | Every part has a line under it: what it opens in the game. Engine and Weight reduction: "Counts on the dyno. Opens no tuning screen" (no tuning record for EN or WT in the game data, test). Transmission: gears only with Extreme (6-speed). **New: Front bumper (aero) and Spoiler (aero), level 1-3**; they open Aerodynamics (front / rear downforce). The Tuner had no field for them. | Records: `docs/setup-bytes.md` l.17-40 and the game data; aero flags `AE_FRONT_BUMPER_L1..3`, `AE_SPOILER_L1..3` (`withAero` in `src/model/virtual-save.ts`) |
+| Tabs | Five buttons with the game's captions in its order: **Circuit, Drag, Drift, Street X, URL Race**, no "tab" suffix. Under each name: "Circuit, Sprint, career URL" / "career and Quick Race" / "Quick Race URL only". On the card a table **Career races / Quick Race**. Tabs with the same plan keep their own button and open one card ("Same plan for the tabs Circuit + URL Race"). | Captions and order seen in game: `native/runs/dyno_check_20261106/s4/*_setting_0..4.png` (tuner repo); which race loads which tab: `docs/setup-bytes.md` l.89-103, career URL = Circuit in game l.166-174 |
+| Screen order on the card | Suspension, Drivetrain, Aerodynamics, Tires & Brakes, ECU, Turbo, Nitrous. | Code: item index 0..6, `FUN_0055ab80` (`docs/native-menu-map.md` l.164-170); seen: `native/runs/tune_screens_20261106/*_master_*.png`, e.g. Aerodynamics left of Tires & Brakes, Garage left of it |
+| Thumbnails | The game's own car-select logo of the picked car (white logo, 256×64) next to the car choice. | Texture `SECONDARY_LOGO_<car>` in `FRONTEND/FrontB.lzc`, found for all 32 non-traffic cars by name hash |
+
+Thumbnails, how: the game has no 2D car picture (car select shows the 3D model); it has a name logo per car.
+`tools/extract_car_logos.py` (tuner repo, branch `feat/tuner-r3c`) decodes them (JDLZ + TPK reader from
+`native/nfsu2-web/tools/texpacks.py`, DXT3 → PNG) into `data/game/logos/<car>.png` (gitignored, EA's files, personal use).
+`tools/serve_editor.py` serves them at `/game/logos/<car>.png` (127.0.0.1 only; only plain names, `..` gives 404). Without the
+files the page hides the logo box. Wiki photos were not used: NFS wiki images are EA screenshots (copyright EA, the wiki's
+CC BY-SA covers its text, not those images), and the game's own logos did the job locally. No game image is committed:
+`r3c-1` in git has the logo hidden; the copy with the logo is `data/out/r3c-1-pick-car-parts-with-logo.png` of the tuner repo (not in git).
+
+Checks (headless Brave on http://127.0.0.1:8771/, served by `serve_editors.sh`): GLOBALB.BUN loads by itself, no file prompt;
+logo shown; no save, 3000GT with only ECU Pro: Suspension, Drivetrain, Aerodynamics, Tires & Brakes, Turbo, Nitrous Locked, ECU Change,
+Circuit and URL Race share one card (the first run where two tabs merged in a browser); owner's save slot 2: 5 cards, 26-29 s, Circuit
+5.02 / 11.38 / 309.0 / 421.4 → 4.22 / 10.35 / 323.5 / 433.8 and the ECU / Turbo presses equal round 2 and `docs/dyno-check-3000gt.md`
+row 0 (checked in game in round 1); Save editor still lists the slots; no page errors.
+
+Screens: ![parts and hints](img/r3c-1-pick-car-parts.png) ![no save, locked screens, shared card](img/r3c-2-no-save-locked.png)
+![save, Circuit card](img/r3c-3-save-circuit-card.png) ![ECU bars in words](img/r3c-4-ecu-bars.png) ![URL Race card](img/r3c-5-url-card.png)
+![Drag card](img/r3c-6-drag-card.png)
+
+Tests: `npm test` **130, 109 pass, 0 fail, 21 skipped** (author's `save.test.ts` unchanged). New in `src/test/tuner.test.ts`: which part opens
+which screen (from the game data; Engine and Weight open none), every card lists the 7 screens in menu order with locked ones,
+aero levels set one flag each.
+
+Design critique after the first 3c screenshots, fixed: the "not tuned" sentence stood four times on a card (now one line at the end);
+tab sub-lines "Drag / Drag" said nothing (now "career and Quick Race"); a merged card put URL Race first in the tab row (now five
+buttons in game order); "Round 2" ran into bar 1's presses (now 1st / 2nd / 3rd); the logo sat under the part list (now next to the car
+choice); slider steps read keys first, values last (now "4.05 → 3.96. Keys: …"). Still heavy: ECU and Turbo charts each take a screen
+height; the red / yellow marks of the chart have no legend (author's chart).
+
+Not checked (3c): nothing of 3c was tried in the running game. Not seen in game: how the game shows a locked screen (hidden or greyed),
+and which body parts in the shop set the aero flags (the editor reads them as flags 56-67). "Reset (key C)" resets the selected row: measured
+for suspension and final drive, from code for the others; not tried on 6-speed gears. Phone widths and other browsers not tried.
+
 ## 7. Undo
 
-`git checkout feat/hand-input && npm run build` in `port-editor` (the author's screen and round 2 come back as before), or delete the
+Round 3c only: `git checkout feat/tuner-r3 && npm run build` in `port-editor`. All of round 3: `git checkout feat/hand-input && npm run build` in `port-editor` (the author's screen and round 2 come back as before), or delete the
 branch: `git branch -D feat/tuner-r3` and `git push fork --delete feat/tuner-r3`.
