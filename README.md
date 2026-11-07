@@ -4,6 +4,16 @@ A browser-based career save editor for Need for Speed: Underground 2 (`SPEED2.EX
 
 The live site is deployed to GitHub Pages from `main`. See [doc.md](doc.md) for what we know about the save format.
 
+## About this fork
+
+This is a fork by ASYMILO. The original editor is by Christopher Hack: [hackch/NFSU2-Savegame-Editor](https://github.com/hackch/NFSU2-Savegame-Editor). Both are under the MIT license (see [LICENSE](LICENSE)).
+
+Changes in this fork:
+- A Tuner step after picking a car: it finds the best setup for each race type, as keys to press in the game or written to the save.
+- Optimizer that follows the game's own tuning-screen rules (`src/model/legal-opt.ts`, `src/model/tuner.ts`).
+- Tune without a save: pick a car and parts from a list.
+- Dyno fixes that were merged upstream (PR #4, #6) and checks against the running game (`docs/tuner-round3.md`).
+
 ## Savefile discovery map
 
 ![Byte-level discovery grid of the NFSU2 career save](save-coverage.svg)
