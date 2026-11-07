@@ -31,30 +31,30 @@ export interface FeelView extends FeelSlider {
 }
 
 /**
- * Every slider names the game code that uses its rows, and the direction (setup-bytes.md of the tuner repo, section C).
- * The driving words come from textbook car handling; that the game feels that way is not checked in the game.
+ * Only rows with a measured effect in the game get a slider, and the words say only what was measured (round 3g, tuner
+ * repo docs/game-check-r3g.md D: 3000GT, setup 0, free roam on the airport road, every row at both ends of its box, each run
+ * twice with the same input; numbers that differed between the two runs are not used). Rows dropped there moved stopping
+ * distance and side grip by 4 % or less: springs, shocks, sway bars, ride height, tire grip, downforce.
  */
 export const FEEL_SLIDERS: FeelSlider[] = [
-  // springs and shocks: FUN_005a3700, F = spring·0.9·compression + 0.9·shock·speed (setup-bytes.md l.115-117). Sway bars are
-  // left out: their force code was not found (l.118), so no proof they do anything.
-  { key: 'stiff', screen: 'Suspension', label: 'Ride', low: 'Soft, soaks bumps', high: 'Firm, quick to react', params: [0, 4, 1, 5],
-    basis: 'Moves Front and Rear Springs and Shocks together (up = stiffer). Sway bars and lowering stay: their effect in the game is not known.',
-    when: 'Firmer if the car leans and sways in turns. Softer if bumps throw it off line.' },
-  // aero FUN_0059e620: downforce ∝ coefficient × speed term (l.125-126); Street and Pro parts can only lower it (l.53)
-  { key: 'downforce', screen: 'Aerodynamics', label: 'Grip at high speed', low: 'Less', high: 'More', params: [21, 22],
-    basis: 'Moves Front and Rear Downforce together. Downforce presses the car down more the faster it goes.',
-    when: 'More if the car slides in fast turns.' },
-  // brakes FUN_005a4d80: front = 2·pedal·(1−B), rear = 2·pedal·B, B = this row (l.120-121)
-  { key: 'brakes', screen: 'Tires & Brakes', label: 'Braking', low: 'Stable, straight', high: 'Turns in more', params: [18],
-    basis: 'Moves Brake Bias: to the right, more brake force goes to the rear wheels.',
-    when: 'Left if the back steps out when you brake. Right if the car will not turn while braking.' },
-  // tire friction FUN_005a8280: force = grip × load (l.122-125); the row can only lower grip (l.53)
-  { key: 'rearGrip', screen: 'Tires & Brakes', label: 'Rear end', low: 'Slides more (drift)', high: 'Grips (as the tires give)', params: [20],
-    basis: 'Moves Rear Grip. The game lets you only lower it from what your tires give.',
-    when: 'Left if you want the back to slide, for example in Drift.' },
-  // nitrous: one slider, longer = weaker (FUN_005b3100, l.58); extra torque = torque × intensity (FUN_00594300, l.127)
+  // byte 8 ("Steering Ratio" on the Suspension screen; physics R+0x270, setup-bytes.md). Measured: same stick 0.4, side g of
+  // the path 0.737 / 0.808 / 0.907 at 100 km/h (lowest / saved / highest byte) and 0.685 / 0.711 / 0.875 at 150 km/h; full
+  // stick: no change (the tires are the limit there); stopping distance unchanged. Slow corner: radius 37.1 -> 31.0 m (r3f C).
+  { key: 'steering', screen: 'Suspension', label: 'Steering', low: 'Slower', high: 'Quicker', params: [8],
+    basis: 'Moves Steering Ratio. Measured in the game (3000GT): with the same small steering input the car turns 4-9 % less '
+      + 'at the left end and 12-23 % more at the right end, at 100 and 150 km/h. At full steering it changes nothing.',
+    when: 'Right: the car turns more for the same steering. Left: less.' },
+  // brakes FUN_005a4d80: front = 2·pedal·(1−B), rear = 2·pedal·B, B = this row (setup-bytes.md l.120-121). Measured: full brake
+  // from 100 km/h 20.93 / 23.16 / 27.90 m, from 150 km/h 45.8-45.9 / 48.25 / 57.02 m (lowest / saved / highest byte); the car
+  // stayed straight within 1.6 deg every time; turning was not changed.
+  { key: 'brakes', screen: 'Tires & Brakes', label: 'Braking', low: 'Stops shorter', high: 'Stops longer', params: [18],
+    basis: 'Moves Brake Bias: to the right, more brake force goes to the rear wheels. Measured in the game (3000GT): stopping '
+      + 'from 100 km/h takes 21 m at the left end, 23 m as saved and 28 m at the right end; from 150 km/h 46, 48 and 57 m.',
+    when: 'Left for shorter stops. The car stayed straight at both ends in the test.' },
+  // nitrous: one slider, longer = weaker (FUN_005b3100, l.58); seen in the game 2026-11-04 (setup-bytes.md "Confirmed in game":
+  // a long and a very short setting were clearly visible in play)
   { key: 'nitrous', screen: 'Nitrous', label: 'Nitrous boost', low: 'Long, gentle', high: 'Short, strong', params: [16],
-    basis: 'Moves the Nitrous slider. The game ties both: a shorter shot is a stronger one.',
+    basis: 'Moves the Nitrous slider. The game ties both: a shorter shot is a stronger one (seen in the game).',
     when: 'Short and strong for a quick burst. Long and gentle to spread it over the race.' },
 ];
 
@@ -96,16 +96,10 @@ export function feelSliders(model: DynoModel, start: ArrayLike<number>, setups: 
   const out: FeelView[] = [];
   for (const s of FEEL_SLIDERS) {
     if (s.key === 'nitrous' && setups.every((k) => k === 2 || k === 3)) continue;
-    const { left, right, open } = sides(model, start, s);
+    const { left, right } = sides(model, start, s);
     if (!left && !right) continue;
-    let v: FeelView = { ...s, min: left ? -100 : 0, max: right ? 100 : 0, limit: '' };
-    if (s.key === 'downforce' && open.length === 1) {
-      // one body part only: one axle moves, so it shifts grip between front and rear (FUN_0059e620 applies each at its own point)
-      const front = open[0] === 21;
-      v = { ...v, label: `${front ? 'Front' : 'Rear'} grip at high speed`,
-        basis: `Moves ${front ? 'Front' : 'Rear'} Downforce only (only a ${front ? 'front bumper' : 'spoiler'} opens it). One end only: it shifts grip between front and rear.` };
-    }
-    if (!right) v.limit = s.key === 'rearGrip' ? 'Only to the left: the game lets you only lower it.' : 'Only to the left: your parts do not allow more.';
+    const v: FeelView = { ...s, min: left ? -100 : 0, max: right ? 100 : 0, limit: '' };
+    if (!right) v.limit = 'Only to the left: your parts do not allow more.';
     else if (!left) v.limit = 'Only to the right: your parts do not allow less.';
     out.push(v);
   }

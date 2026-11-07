@@ -30,6 +30,8 @@ export interface SliderPlan {
   /** Bar height in N*m the plan reaches per column, and the optimum's (curves only). */
   reached?: number[];
   wanted?: number[];
+  /** Final drive: run i stops at an end of the row (see {@link Route}); number sliders keep theirs in `row.ends`. */
+  ends?: boolean[];
   /** Number sliders: what the screen shows, so the plan reads like the game (see {@link rowPlanner}). */
   row?: { param: number; label: string; saved: string; wanted: string; reached: string; again: boolean; ends?: boolean[] };
 }
@@ -150,10 +152,18 @@ const finalDrivePlanner: SliderPlanner = (model, current, target, objective, ctx
     if (cost < pickCost - 1e-12 || (Math.abs(cost - pickCost) <= 1e-12 && pick && node.presses < pick.presses)) { pick = node; pickCost = cost; }
   }
   if (!pick) return null;
+  // which runs stop at an end of the row (one key more changes no byte): the way bounces there
+  let at: Uint8Array = pick.start === 'C' ? Uint8Array.from(current, (b, i) => (i === 9 ? 100 : b)) : Uint8Array.from(current);
+  const ends = pick.runs.map((n) => {
+    const dir = n > 0 ? 1 : -1;
+    for (let k = 0; k < Math.abs(n); k++) at = pressFinalDrive(model, at, dir) ?? at;
+    const more = pressFinalDrive(model, at, dir);
+    return !more || more[9] === at[9];
+  });
   return {
     id: 'finalDrive', screen: 'Drivetrain', start: pick.start, columns: ['Final drive'],
     passes: pick.runs.length ? pick.runs.map((n) => [n]) : [[0]],
-    presses: pick.presses - (pick.start === 'C' ? 1 : 0), setup: pick.setup,
+    presses: pick.presses - (pick.start === 'C' ? 1 : 0), setup: pick.setup, ends,
   };
 };
 

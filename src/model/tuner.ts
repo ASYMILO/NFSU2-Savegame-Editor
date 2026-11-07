@@ -254,7 +254,7 @@ export function tunerSteps(model: DynoModel, r: TabResult, fromC: boolean): Tune
     touched.add(String(param));
     const runs = p.passes.map((x) => x[0]).filter(Boolean);
     const c = p.start === 'C' || (fromC && !reset.includes(param));
-    const keys = [c ? RESET : '', runs.length ? runText(runs, p.row?.ends) : ''].filter(Boolean).join(', then ') || 'no key';
+    const keys = [c ? RESET : '', runs.length ? runText(runs, p.row?.ends ?? p.ends) : ''].filter(Boolean).join(', then ') || 'no key';
     steps.push({
       screen: p.screen, row: p.row?.label ?? 'Final Drive Ratio', keys, shows: shownText(model, p.setup, param),
       from: shownText(model, r.start, param), presses: runs.reduce((a, n) => a + Math.abs(n), 0) + (c ? 1 : 0),
