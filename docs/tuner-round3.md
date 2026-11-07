@@ -314,8 +314,56 @@ Power vs top speed: 3000GT Circuit shows 323.5 km/h and 323.5 kW. Two values, fr
 - Feel of the sliders in the game (as 3d).
 - Other browsers, phones (only 420 px width in Brave).
 
+## 3f. Save editor first, Tuner from a car slot (2026-11-07)
+- The author's save editor is the start page again; the Tuner opens from a car slot ("Best setup (Tuner)…"); no-save tuning is a
+  small link (commit bb8ec1c). LICENSE line and README fork section (40e37bc). 147 tests pass, 0 skipped.
+- In-game: the game clamps setup bytes outside the slider box on load (tuner repo `docs/game-check-r3f.md` B), so there is no
+  "no limits" mode. Driving rows in a slow corner: only byte 8 changes much (r3f C).
+- Independent review (player, critic, completeness): verdict "almost"; its list is the order of round 3g.
+
+## 3g. Review fixes, game checks, measured driving sliders (2026-11-07, branch `feat/tuner-r3g`)
+
+| Item | Done | Evidence |
+|---|---|---|
+| Phone width | page 390 px wide at 390 px (was 465) | `app.css` 3g media block; walk `$KIROCREW_SCRATCH/r3g/ui/walk.cjs` "page size" |
+| Drivetrain order | steps 1st..6th Gear, then Final Drive (planner order changed, same dyno numbers) | `hand-input.ts` SLIDER_PLANNERS; test "Drivetrain steps read like the screen" |
+| Odd key path | a run that ends at the box end says "(to the end)"; gears take a one-way path when the dyno numbers are the same | `hand-input.ts` routeToByte/straightRoute; game: tuner repo `docs/game-check-r3g.md` A |
+| No save | Drivetrain starts with one step "C on each row, top to bottom" (a later C would undo a gear push) | `tuner.ts` tunerSteps; game run `r3g_gear6_nosave_s0` 140/140 |
+| 0-60 unit | "0-60 mph", "0-100 mph" (the dyno stops its clocks at 60/100 mph: `dyno.ts` dragSim) | `tuner-controller.ts` |
+| Header, chart colours, length | "Tuner" title on the Tuner page; legend under each ECU/Turbo graph; "Slider values now", step 6 and the Gap column removed | `index.html` |
+| "Nothing to do …" | driving sliders sit on their game screen's block on the card; a screen with nothing to set says "Leave it as it is"; in save mode only the screens with sliders show | `tuner.ts` screenPlans (`feel` state), `index.html` |
+| Goal | per tab, on the card ("What counts most here"); a tab does not offer its own goal twice; "strong pull from a stop" removed (our own 90 %, moved the 3000GT by 0.06 s at most) | numbers below; `tuner.ts` goalChoices |
+| GLOBALB.BUN | picked once, kept in IndexedDB, "Forget the file"; the `./game/GLOBALB.BUN` fetch is gone | `browser-store.ts`, `editor-controller.ts` rememberGameFile |
+| Kept choices | localStorage: save/by hand, goal and sliders per tab; checked on read; "Forget my choices" | `browser-store.ts` parsePrefs + test |
+| Sliders | Steering (byte 8, new) and Braking with measured numbers; Nitrous; Ride, Grip at high speed, Rear end removed (<= 4 % in the game) | `feel.ts`; tuner repo `docs/game-check-r3g.md` D |
+
+Goal, model numbers (Optimize per tab, 0-60 / 0-100 / top km/h; `$KIROCREW_SCRATCH/r3g/goal_*.json`):
+
+| Tab | 3000GT as the race needs | quicker acceleration | higher top speed | RX-8 (all Extreme) race / accel / top |
+|---|---|---|---|---|
+| Circuit | 4.22 / 10.33 / 323.5 | 4.10 / 10.14 / 318.6 | 4.20 / 10.31 / 323.5 | 2.84/6.61/352.4 · 2.52/5.52/323.5 · = race |
+| Drag | 4.10 / 10.12 / 318.6 | 4.10 / 10.12 / 309.0 | 4.20 / 10.33 / 323.5 | 2.52/5.48/323.5 · 2.52/5.52/323.5 · 2.84/6.61/352.4 |
+| Drift | 4.18 / 10.22 / 318.6 | 4.10 / 10.12 / 318.6 | 4.22 / 10.33 / 323.5 | 2.99/7.38/323.5 · 2.52/5.52/323.5 · 2.84/6.61/352.4 |
+
+The choice is a real trade on a car with gears (RX-8 Circuit: 0.32 s quicker 0-60 or 29 km/h more top speed), small on the
+3000GT (final drive only). "Accel" = the Street X goal, "top" = the URL goal, so it is offered per tab, not for all tabs.
+
+nfsu2.xyz: it keeps the game files in its own origin's private file system (nfsu2-web `web/src/host/datacache.ts` l.129,
+OPFS `cache/`); its server answers `/data/GLOBAL/GLOBALB.BUN` with `cross-origin-resource-policy: same-origin` and no CORS
+header (curl 2026-11-07). Another site cannot read either, so the user picks the file once.
+
+### Checks (3g)
+- `npm test`: 150 tests, 150 pass, 0 skipped; `src/test/save.test.ts` unchanged.
+- Game: tuner repo `docs/game-check-r3g.md` (6-speed mode A 6/6, other cars 4/4, driving rows, clamping in the world and of gears).
+- Browser: headless Brave 1280 and 390 px, no page errors; file kept and forgotten across page loads; choices kept.
+
+### Not checked (3g)
+- Safari and Firefox (no WebKit/Firefox for Playwright on this Mac: `npx playwright install webkit firefox` downloads them).
+- A game set to miles: the gear rows in mph (`FUN_005b09a0` prints km/h or mph); the Tuner shows km/h only.
+- Body roll, steady cornering at the grip limit, setups 1-4 and a second car for the driving rows.
+
 ## 7. Undo
 
-Round 3e only: `git checkout feat/tuner-r3c && npm run build` in `port-editor` (branch `feat/tuner-r3e` stays for later).
+Round 3g only: `git checkout feat/tuner-r3f && npm run build`. Round 3e only: `git checkout feat/tuner-r3c && npm run build` in `port-editor` (branch `feat/tuner-r3e` stays for later).
 Round 3d only: `git checkout 4582180 && npm run build`. Round 3c only: `git checkout feat/tuner-r3 && npm run build` in `port-editor`. All of round 3: `git checkout feat/hand-input && npm run build` in `port-editor` (the author's screen and round 2 come back as before), or delete the
 branch: `git branch -D feat/tuner-r3` and `git push fork --delete feat/tuner-r3`.

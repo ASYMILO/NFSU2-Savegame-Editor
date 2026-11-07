@@ -14,6 +14,21 @@ Changes in this fork:
 - Tune without a save: pick a car and parts from a list.
 - Dyno fixes that were merged upstream (PR #4, #6) and checks against the running game (`docs/tuner-round3.md`).
 
+### Tuner: how to use it (players)
+1. Load your save (or nfsu2-web backup ZIP) at the top. Your file is only read; the Tuner gives you a changed copy.
+2. On your car's slot press **Best setup (Tuner)…**.
+3. The first time, pick your game file `GLOBAL/GLOBALB.BUN` from your NFSU2 folder. This browser keeps it for your next visit
+   (only here, never uploaded); "Forget the file" removes it.
+4. Choose **Write it into my save** (exact best, download a copy and load it in the game) or **Set it by hand in the game**
+   (a list of keys per tuning screen).
+5. Press **Find best setup** (about 15-50 s). You get one tab per race type of the game's dyno screen.
+6. Optional, on each tab: what counts most (as the race needs, quicker acceleration, higher top speed), and the driving
+   sliders measured in the game (Steering, Braking, Nitrous) on the screen they belong to.
+7. Keep your original backup. The browser also keeps your choices (not your save); "Forget my choices" removes them.
+
+The game's dyno 0-60 and 0-100 are in mph, also when the game shows km/h. A save from a game set to miles works the same,
+but the Tuner shows gear speeds in km/h only (the game's mph numbers were not checked).
+
 ## Savefile discovery map
 
 ![Byte-level discovery grid of the NFSU2 career save](save-coverage.svg)
