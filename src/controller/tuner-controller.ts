@@ -45,9 +45,10 @@ const kw = (v: number): string => `${v.toFixed(1)} kW`;
 
 /** @returns `sync`, which the editor calls after the save or the game data changed. */
 export function attachTuner($scope: EditorScope, api: TunerApi): () => void {
-  $scope.view = 'tuner';
+  // the author's save editor is the start page; the Tuner opens from a car slot (or, less visible, without a save)
+  $scope.view = 'editor';
   $scope.tuner = {
-    source: '', slots: [], slot: null, cars: [], carHash: 0,
+    source: '', how: 'save', slots: [], slot: null, cars: [], carHash: 0,
     levels: [
       ...PART_LEVEL_CATEGORIES.map((c) => ({
         code: c.code, label: c.label, value: 0, hint: '',
@@ -106,6 +107,7 @@ export function attachTuner($scope: EditorScope, api: TunerApi): () => void {
       // a new save: the car comes from it; no save: pick from the lists (by hand is the default way, it needs no save)
       if (now.startsWith('1')) t.source = 'save';
       else if (!t.source) t.source = 'list';
+      if (t.source === 'list') t.how = 'hand';
       seen = now;
       clear(true);
       refreshNow();
@@ -181,6 +183,28 @@ export function attachTuner($scope: EditorScope, api: TunerApi): () => void {
         : 'Pick the parts your car has (below). At least an ECU, Turbo or Transmission part is needed: only those can be tuned for speed.',
     };
   }
+
+  /** From a car slot of the save editor: the Tuner with that save and car. */
+  $scope.openTuner = function (slot: number): void {
+    t.source = 'save';
+    t.how = 'save';
+    refreshLists();
+    t.slot = t.slots.some((s) => s.index === slot) ? slot : null;
+    $scope.view = 'tuner';
+    $scope.tunerChanged();
+  };
+
+  /** The add-on: the Tuner with a car and parts from lists, no save; the result can only be set by hand. */
+  $scope.tunerWithoutSave = function (): void {
+    t.source = 'list';
+    t.how = 'hand';
+    $scope.view = 'tuner';
+    $scope.tunerChanged();
+  };
+
+  $scope.tunerBack = function (): void {
+    $scope.view = 'editor';
+  };
 
   $scope.tunerChanged = function (): void {
     // another car or other parts: the old result does not fit any more

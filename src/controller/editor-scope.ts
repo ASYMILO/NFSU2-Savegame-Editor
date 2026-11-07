@@ -267,6 +267,8 @@ export interface TunerFeelView { key: string; screen: string; label: string; low
 export interface TunerView {
   /** No default: the user picks. */
   source: '' | 'save' | 'list';
+  /** How the result is set: written into the save (default with a save) or by hand in the game (the only way without one). */
+  how: 'save' | 'hand';
   slots: { index: number; name: string }[];
   slot: number | null;
   cars: { hash: number; name: string }[];
@@ -420,6 +422,9 @@ export interface EditorScope extends angular.IScope {
   view: 'tuner' | 'editor';
   tuner: TunerView;
   tunerChanged(): void;
+  openTuner(slot: number): void;
+  tunerWithoutSave(): void;
+  tunerBack(): void;
   tunerOptimize(keepView?: boolean): void;
   tunerPref(): void;
   tunerFeel(): void;
