@@ -9,14 +9,25 @@ import { formatSheet, gameNumbers, OBJ_BY_SETUP, runLegal, type GameNumbers } fr
 import { formatHandPlan, planHandInput, ROW_ORDER, shownText, type HandInputPlan, type SliderPlan } from './hand-input.js';
 import { resetRow, rowInfo } from './tune-keys.js';
 
-/** What the owner cares about most. Each choice maps to an objective that already exists in legal-opt.ts; no new weights. */
-export type Preference = 'race' | 'launch' | 'accel' | 'top';
-export const PREFERENCES: { key: Preference; label: string; text: string }[] = [
-  { key: 'race', label: 'Best for each race', text: 'Each tab gets the goal of its own race type. This is the default.' },
-  { key: 'launch', label: 'Strong pull from a stop', text: 'Same goals, but the engine keeps at least 90 % of its factory pull at low revs. The 90 % is our own pick, not a number from the game.' },
-  { key: 'accel', label: 'Quick acceleration', text: 'Every tab aims at short 0-60 and 0-100 times.' },
-  { key: 'top', label: 'High top speed', text: 'Every tab counts top speed most.' },
+/**
+ * The goal of one tab. Each choice maps to an objective that already exists in legal-opt.ts; no new weights. 'accel' is the
+ * Street X goal and 'top' the URL goal, so on those two tabs one of them is the tab's own goal and is not offered twice.
+ * (A former "strong pull from a stop" choice kept 90 % of the factory pull, a number of our own; it moved the 3000GT by
+ * 0.06 s at most and was dropped in round 3g, port docs/tuner-round3.md 3g.)
+ */
+export type Preference = 'race' | 'accel' | 'top';
+export const PREFERENCES: { key: Preference; label: string }[] = [
+  { key: 'race', label: 'As this race needs' },
+  { key: 'accel', label: 'Quicker acceleration' },
+  { key: 'top', label: 'Higher top speed' },
 ];
+
+/** The goals a tab offers: its own, then the others that give another objective. */
+export function goalChoices(setup: number): { key: Preference; label: string; text: string }[] {
+  const own = OBJ_BY_SETUP[setup];
+  return PREFERENCES.filter((p) => p.key === 'race' || legalOptions(p.key, setup).objective !== own)
+    .map((p) => ({ ...p, text: GOAL_WORDS[legalOptions(p.key, setup).objective] ?? '' }));
+}
 
 /**
  * What "best" means for each goal, in plain words. These are the optimizer's own weights (legal-opt.ts OBJECTIVES l.11-17):
@@ -34,7 +45,7 @@ export const GOAL_WORDS: Record<string, string> = {
 export function legalOptions(pref: Preference, setup: number): { objective: string; launchMin: number | null } {
   if (pref === 'accel') return { objective: 'streetx', launchMin: null };
   if (pref === 'top') return { objective: 'url', launchMin: null };
-  return { objective: OBJ_BY_SETUP[setup], launchMin: pref === 'launch' ? 0.9 : null };
+  return { objective: OBJ_BY_SETUP[setup], launchMin: null };
 }
 
 /**
@@ -214,7 +225,13 @@ export function curveKeys(passes: number[][]): string[] {
   return keys;
 }
 
-const runText = (runs: number[]): string => runs.map((n) => `${n > 0 ? 'RIGHT' : 'LEFT'} ${Math.abs(n)} time${Math.abs(n) === 1 ? '' : 's'}`).join(', then ');
+/** "LEFT 14 times (to the end), then RIGHT 3 times": a run that stops at the end of the bar says so (the key path bounces there). */
+export const runText = (runs: number[], ends: boolean[] = []): string => runs.map((n, i) =>
+  `${n > 0 ? 'RIGHT' : 'LEFT'} ${Math.abs(n)} time${Math.abs(n) === 1 ? '' : 's'}${ends[i] && i < runs.length - 1 ? ' (to the end)' : ''}`).join(', then ');
+
+/** Drivetrain rows in the screen's order: 1st..6th Gear, then Final Drive Ratio. */
+const DRIVE_ROWS = [10, 11, 12, 13, 14, 15, 9];
+const driveLabel = (param: number): string => (param === 9 ? 'Final Drive Ratio' : `${['1st', '2nd', '3rd', '4th', '5th', '6th'][param - 10]} Gear`);
 
 /**
  * The steps of a plan, screen by screen in menu order.
@@ -224,6 +241,9 @@ const runText = (runs: number[]): string => runs.map((n) => `${n > 0 ? 'RIGHT' :
 export function tunerSteps(model: DynoModel, r: TabResult, fromC: boolean): TunerStep[] {
   const steps: TunerStep[] = [];
   const touched = new Set<string>();
+  // no save: every Drivetrain row gets its C first, in one step (a gear key pushes its neighbours, and a later C on a pushed
+  // row would undo that push; the plan starts from every row after C, startAfterC)
+  const reset = fromC ? DRIVE_ROWS.filter((param) => model.gearingParameters.includes(param) && rowInfo(model, r.start, param)) : [];
   for (const p of menuOrder(r.plan.plans)) {
     if (p.id === 'ecu' || p.id === 'turbo') {
       touched.add(p.id);
@@ -233,21 +253,19 @@ export function tunerSteps(model: DynoModel, r: TabResult, fromC: boolean): Tune
     const param = p.row?.param ?? 9;
     touched.add(String(param));
     const runs = p.passes.map((x) => x[0]).filter(Boolean);
-    const c = p.start === 'C' || fromC;
-    const keys = [c ? RESET : '', runs.length ? runText(runs) : ''].filter(Boolean).join(', then ') || 'no key';
+    const c = p.start === 'C' || (fromC && !reset.includes(param));
+    const keys = [c ? RESET : '', runs.length ? runText(runs, p.row?.ends) : ''].filter(Boolean).join(', then ') || 'no key';
     steps.push({
       screen: p.screen, row: p.row?.label ?? 'Final Drive Ratio', keys, shows: shownText(model, p.setup, param),
       from: shownText(model, r.start, param), presses: runs.reduce((a, n) => a + Math.abs(n), 0) + (c ? 1 : 0),
     });
   }
   if (fromC) {
-    // rows Optimize can move (gears, final drive) and curves: a C makes the game hold the start the plan assumed
+    // Drivetrain rows and curves: a C makes the game hold the start the plan assumed
     const extra: TunerStep[] = [];
-    for (const param of model.gearingParameters) {
-      if (touched.has(String(param)) || !rowInfo(model, r.start, param)) continue;
-      const label = param === 9 ? 'Final Drive Ratio' : `${['1st', '2nd', '3rd', '4th', '5th', '6th'][param - 10]} Gear (km/h)`;
-      const shows = shownText(model, r.plan.setup, param);
-      extra.push({ screen: 'Drivetrain', row: label, keys: RESET, shows, from: shows, presses: 1 });
+    if (reset.length) {
+      const names = reset.map(driveLabel);
+      extra.push({ screen: 'Drivetrain', row: 'Every row first', keys: `${RESET} on each row, top to bottom: ${names.join(', ')}`, shows: '', presses: reset.length });
     }
     for (const kind of ['ecu', 'turbo'] as const) {
       if (!touched.has(kind) && model.curve(r.start, kind)) extra.push({ screen: kind === 'ecu' ? 'ECU' : 'Turbo', row: 'Bars', keys: RESET, shows: '', presses: 1 });
@@ -263,8 +281,11 @@ export function tunerSteps(model: DynoModel, r: TabResult, fromC: boolean): Tune
 /** One screen of the game's menu on a card: what to do there, or why there is nothing to do. */
 export interface ScreenPlan {
   name: string;
-  /** `set`: steps below; `ok`: Optimize tunes it, already right; `keep`: Optimize does not tune it; `locked`: no part opens it. */
-  state: 'set' | 'ok' | 'keep' | 'locked';
+  /**
+   * `set`: steps below; `ok`: Optimize tunes it, already right; `feel`: Optimize does not tune it, but driving sliders for it
+   * are on this screen's block (moving one adds steps); `keep`: nothing changes it; `locked`: no part opens it.
+   */
+  state: 'set' | 'ok' | 'feel' | 'keep' | 'locked';
   text: string;
   steps: TunerStep[];
 }
@@ -278,12 +299,14 @@ export const TUNED = new Set(['Drivetrain', 'ECU', 'Turbo']);
 /**
  * Every screen of the menu in the game's order, with the steps of `steps` under their screen (`setups`: the card's tabs).
  * @param whatIf Extra line for a locked screen (the dyno with the part that opens it), by screen name.
+ * @param feel Screens that have a driving slider for this card (feel.ts feelSliders); they are shown on the screen's block.
  */
-export function screenPlans(model: DynoModel, setups: number[], steps: TunerStep[], whatIf: Record<string, string> = {}): ScreenPlan[] {
+export function screenPlans(model: DynoModel, setups: number[], steps: TunerStep[], whatIf: Record<string, string> = {},
+  feel: ReadonlySet<string> = new Set()): ScreenPlan[] {
   return SCREENS.map(({ name, params }) => {
     const own = steps.filter((s) => s.screen === name);
     const tuned = TUNED.has(name);
-    if (own.length) return { name, state: 'set', text: tuned ? '' : 'Set by your preferences (below the steps).', steps: own };
+    if (own.length) return { name, state: 'set', text: tuned ? '' : 'From your sliders below.', steps: own };
     if (!params.some((p) => model.tuningRecords.has(p))) {
       const then = tuned ? 'Then the Tuner sets it.' : 'The Tuner does not set it.';
       return { name, state: 'locked', text: `Buy ${unlockParts(model.game, params).join(' or ')} to open it. ${then}${whatIf[name] ? ` ${whatIf[name]}` : ''}`, steps: [] };
@@ -291,7 +314,8 @@ export function screenPlans(model: DynoModel, setups: number[], steps: TunerStep
     if (tuned) return { name, state: 'ok', text: 'The Tuner checked it: already right for this race.', steps: [] };
     // drift and Street X presets zero nitrous duration (docs/setup-bytes.md l.103, FUN_005b4dc0)
     if (name === 'Nitrous' && setups.every((k) => k === 2 || k === 3)) return { name, state: 'keep', text: 'This race turns nitrous off.', steps: [] };
-    return { name, state: 'keep', text: 'The Tuner does not set it for speed. Use your preferences below, or leave it.', steps: [] };
+    if (feel.has(name)) return { name, state: 'feel', text: 'Optional. Leave it, or move a slider if the car feels wrong.', steps: [] };
+    return { name, state: 'keep', text: 'Leave it as it is.', steps: [] };
   });
 }
 

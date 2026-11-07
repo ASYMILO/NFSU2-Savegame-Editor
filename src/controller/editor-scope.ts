@@ -144,8 +144,9 @@ export interface GearChart {
 export interface DynoView {
   gameName: string;
   gameError: string;
-  /** The page's own server has no copy of GLOBALB.BUN (./game/GLOBALB.BUN did not load). */
-  localMissing?: boolean;
+  /** The game file is kept in this browser (Tuner picker, browser-store.ts); `forgotten`: the user removed it this visit. */
+  remembered?: boolean;
+  forgotten?: boolean;
   setup: DynoEvent;
   setupNames: string[];
   strategy: string;
@@ -235,10 +236,15 @@ export interface TunerCardView {
   compare: { label: string; now: string; after: string }[];
   /** What "best" means for this card's race, in plain words (the optimizer's own choice). */
   goal: string;
+  /** The goals this card offers (its own first) and the one picked. */
+  goals: { key: string; label: string; text: string }[];
+  goalKey: string;
   presses: number;
   /** Every screen of the game's menu, in its order. */
   screens: {
-    name: string; state: 'set' | 'ok' | 'keep' | 'locked'; badge: string; text: string;
+    name: string; state: 'set' | 'ok' | 'feel' | 'keep' | 'locked'; badge: string; text: string;
+    /** The card has driving sliders for this screen (shown on its block). */
+    hasFeel: boolean;
     steps: { screen: string; row: string; keys: string; shows: string; from?: string; presses: number; chart?: CurveChart; done?: boolean }[];
   }[];
   note: string;
@@ -276,15 +282,11 @@ export interface TunerView {
   /** Part levels; `hint` says which screen of the game the part opens. */
   levels: (VirtualView['levels'][number] & { hint: string })[];
   now: TunerNowView | null;
-  pref: string;
-  prefs: { key: string; label: string; text: string }[];
   busy: boolean;
   progress: string;
   /** Race types done of 5 while Optimize runs, and the seconds since it started. */
   done: number;
   seconds: number;
-  /** The preferences box is open (kept open while the cards are rebuilt). */
-  prefsOpen: boolean;
   error: string;
   /** The save changed after the last Optimize. */
   stale: boolean;
@@ -382,6 +384,9 @@ export interface EditorScope extends angular.IScope {
   swapSlots(slot: number): void;
   replaceCar(slot: number): void;
   loadGameData(file: File | null): void;
+  /** The Tuner's picker: loads the game file and keeps it in this browser. */
+  rememberGameFile(file: File | null): void;
+  forgetGameFile(): void;
   /** Without a save: pick a car and part levels from lists (needs the game data). */
   virtual: VirtualView;
   startNoSave(): void;
@@ -426,7 +431,12 @@ export interface EditorScope extends angular.IScope {
   tunerWithoutSave(): void;
   tunerBack(): void;
   tunerOptimize(keepView?: boolean): void;
-  tunerPref(): void;
+  /** Another goal for the card on show: Optimize again for its tabs. */
+  tunerGoal(key: string): void;
+  /** Forget the Tuner's kept choices (goals, sliders, A/B) in this browser. */
+  tunerForgetPrefs(): void;
+  /** The save / by-hand choice changed (kept in this browser). */
+  tunerHow(): void;
   tunerFeel(): void;
   tunerTab(card: number): void;
   tunerDownload(): void;

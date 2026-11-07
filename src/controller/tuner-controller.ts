@@ -14,9 +14,10 @@ import { AERO_PARTS, buildVirtualSave, installedForLevels, levelsOf, PART_LEVEL_
 import { gameNumbers, type GameNumbers } from '../model/legal-opt.js';
 import { ROW_LABELS, ROW_ORDER, shownText } from '../model/hand-input.js';
 import { NitroScreen, rowInfo } from '../model/tune-keys.js';
-import { feelSliders, withFeel, type Feel } from '../model/feel.js';
+import { FEEL_SLIDERS, feelSliders, withFeel, type Feel } from '../model/feel.js';
+import { clearPrefs, loadPrefs, savePrefs } from './browser-store.js';
 import {
-  categoryScreens, GOAL_WORDS, groupTabs, legalOptions, lockedWhatIf, optimizeTab, planTab, PREFERENCES, SCREENS, screenPlans, SETUP_COUNT, startAfterC,
+  categoryScreens, GOAL_WORDS, goalChoices, groupTabs, legalOptions, lockedWhatIf, optimizeTab, planTab, PREFERENCES, SCREENS, screenPlans, SETUP_COUNT, startAfterC,
   TAB_NAMES, TAB_USES, TUNED, tunerSteps, type Preference, type TabResult,
 } from '../model/tuner.js';
 import { curveChart } from './editor-controller.js';
@@ -40,7 +41,8 @@ const LEVEL_WORDS = ['None', 'Street', 'Pro', 'Extreme'];
 const sec = (v: number | null): string => (v === null ? '–' : `${v.toFixed(2)} s`);
 const kmh = (v: number): string => `${v.toFixed(1)} km/h`;
 // the game's dyno screen shows 0-60 / 0-100 without a unit, top speed in km/h and power in kW (tuner repo
-// native/runs/dyno_check_20261106/results_A_all.png, docs/dyno-check-3000gt.md), so the Tuner shows the same
+// native/runs/dyno_check_20261106/results_A_all.png, docs/dyno-check-3000gt.md), so the Tuner shows the same; the 0-60 and
+// 0-100 are mph (the dyno stops its clocks at 60 and 100 mph, FUN_005b06a0, dyno.ts dragSim `60 <= v * mph`), so the labels say so
 const kw = (v: number): string => `${v.toFixed(1)} kW`;
 
 /** @returns `sync`, which the editor calls after the save or the game data changed. */
@@ -59,13 +61,21 @@ export function attachTuner($scope: EditorScope, api: TunerApi): () => void {
         options: [{ value: 0, label: 'None' }, ...[1, 2, 3].map((l) => ({ value: l, label: `Level ${l}` }))],
       })),
     ],
-    now: null, pref: 'race', prefs: PREFERENCES, busy: false, progress: '', done: 0, seconds: 0, prefsOpen: false, error: '', stale: false, carName: '', fromC: true,
+    now: null, busy: false, progress: '', done: 0, seconds: 0, error: '', stale: false, carName: '', fromC: true,
     canDownload: false, cards: [], tabs: [], card: 0, feel: {}, sliders: [],
   };
   const t = $scope.tuner;
   /** Optimize's result per tab (engine rows), the slider positions per tab, and the plans made from both. */
   let base: Uint8Array[] = [];
-  let feels: Feel[] = [];
+  // the choices kept in this browser (browser-store.ts): goal and slider positions per tab, and A or B
+  const goalKeys = PREFERENCES.map((p) => p.key), feelKeys = FEEL_SLIDERS.map((f) => f.key);
+  const kept = (): { how: 'save' | 'hand'; goals: Preference[]; feels: Feel[] } => {
+    const p = loadPrefs(goalKeys, feelKeys);
+    return { how: p?.how ?? 'save', goals: (p?.goals ?? new Array(SETUP_COUNT).fill('race')) as Preference[], feels: p?.feels ?? [] };
+  };
+  let goals = kept().goals;
+  let feels: Feel[] = kept().feels;
+  const keep = (): void => savePrefs({ how: t.source === 'save' ? t.how : kept().how, goals, feels: Array.from({ length: SETUP_COUNT }, (_, k) => feels[k] ?? {}) });
   let results: TabResult[] = [];
   let src: Source | null = null;
   let runToken = 0;
@@ -127,7 +137,7 @@ export function attachTuner($scope: EditorScope, api: TunerApi): () => void {
     if (keepView) return;
     results = [];
     base = [];
-    if (dropFeel) feels = [];
+    if (dropFeel) feels = kept().feels;
     t.cards = []; t.tabs = []; t.card = 0; t.stale = false; t.sliders = []; t.feel = {};
   }
 
@@ -187,7 +197,7 @@ export function attachTuner($scope: EditorScope, api: TunerApi): () => void {
   /** From a car slot of the save editor: the Tuner with that save and car. */
   $scope.openTuner = function (slot: number): void {
     t.source = 'save';
-    t.how = 'save';
+    t.how = kept().how;
     refreshLists();
     t.slot = t.slots.some((s) => s.index === slot) ? slot : null;
     $scope.view = 'tuner';
@@ -240,12 +250,12 @@ export function attachTuner($scope: EditorScope, api: TunerApi): () => void {
   /** Plan of one tab from Optimize's result and the tab's sliders (they change only rows Optimize leaves alone). */
   function plan(s: Source, setup: number, sheet: string): TabResult {
     const target = withFeel(s.model, s.starts[setup], base[setup], feels[setup] ?? {});
-    return planTab(s.model, setup, s.starts[setup], target, t.pref as Preference, sheet);
+    return planTab(s.model, setup, s.starts[setup], target, goals[setup], sheet);
   }
 
   function show(keepCard: number): void {
     if (!src) return;
-    t.cards = cards(src, results, t.pref as Preference);
+    t.cards = cards(src, results, goals);
     // the game's five tabs in its order; tabs with the same plan open the same card
     t.tabs = TAB_NAMES.map((name, setup) => ({ name, short: TAB_USES[setup].short, card: t.cards.findIndex((c) => c.setups.includes(setup)) }));
     $scope.tunerTab(Math.min(keepCard, t.cards.length - 1));
@@ -272,24 +282,40 @@ export function attachTuner($scope: EditorScope, api: TunerApi): () => void {
       feels[setup] = { ...t.feel };
       results[setup] = plan(src, setup, results[setup].legalSheet);
     }
+    keep();
     show(t.card);
   };
 
-  $scope.tunerPref = function (): void {
-    // another goal: Optimize again, the sliders stay, the cards stay on show until the new ones are ready
-    if (t.cards.length || t.busy) $scope.tunerOptimize(true);
+  $scope.tunerGoal = function (key: string): void {
+    // another goal for this card's tabs: Optimize again (the other tabs come from the cache), the sliders stay, the cards
+    // stay on show until the new ones are ready
+    const view = t.cards[t.card];
+    if (!view || t.busy || !goalKeys.includes(key as Preference)) return;
+    for (const setup of view.setups) goals[setup] = key as Preference;
+    keep();
+    $scope.tunerOptimize(true);
   };
+
+  $scope.tunerForgetPrefs = function (): void {
+    clearPrefs();
+    goals = new Array(SETUP_COUNT).fill('race');
+    feels = [];
+    if (t.source === 'save') t.how = 'save';
+    if (t.cards.length && !t.busy) $scope.tunerOptimize(true);
+  };
+
+  $scope.tunerHow = function (): void { if (t.source === 'save') keep(); };
 
   $scope.tunerOptimize = function (keepView = false): void {
     const s = source();
     const keepCard = t.card;
     clear(false, keepView && t.cards.length > 0);
     if (typeof s === 'string') { t.error = s; return; }
-    const token = runToken, pref = t.pref as Preference;
+    const token = runToken, pref = goals.slice();
     const save = api.save();
     const fresh: TabResult[] = [], nextBase: Uint8Array[] = [];
     const keyOf = (setup: number): string =>
-      [s.hash, s.installed.map(Number).join(''), s.uniques.join(','), Array.from(s.starts[setup]).join(','), setup, pref].join('|');
+      [s.hash, s.installed.map(Number).join(''), s.uniques.join(','), Array.from(s.starts[setup]).join(','), setup, pref[setup]].join('|');
     let done = 0;
     t.busy = true;
     t.seconds = 0;
@@ -300,7 +326,7 @@ export function attachTuner($scope: EditorScope, api: TunerApi): () => void {
       if ('error' in out) { t.error = `${TAB_NAMES[setup]}: ${out.error}`; t.busy = false; stopClock(); runToken++; return; }
       cache.set(keyOf(setup), out);
       nextBase[setup] = Uint8Array.from(out.bytes);
-      fresh[setup] = planTab(s.model, setup, s.starts[setup], withFeel(s.model, s.starts[setup], nextBase[setup], feels[setup] ?? {}), pref, out.sheet);
+      fresh[setup] = planTab(s.model, setup, s.starts[setup], withFeel(s.model, s.starts[setup], nextBase[setup], feels[setup] ?? {}), pref[setup], out.sheet);
       done++;
       t.done = done;
       if (done === SETUP_COUNT) {
@@ -326,7 +352,7 @@ export function attachTuner($scope: EditorScope, api: TunerApi): () => void {
     if (!todo.length) return;
     const job = (setup: number) => ({
       type: 'job', id: token * 10 + setup, hash: s.hash, installed: s.installed, uniques: s.uniques,
-      start: Array.from(s.starts[setup]), setup, pref,
+      start: Array.from(s.starts[setup]), setup, pref: pref[setup],
     });
     const onMain = (queue: number[]): void => {
       // no workers (or one failed): one tab after another on the page's thread
@@ -334,7 +360,7 @@ export function attachTuner($scope: EditorScope, api: TunerApi): () => void {
       if (next === undefined || token !== runToken) return;
       setTimeout(() => {
         $scope.$apply(() => {
-          try { finish(next, optimizeTab(s.model, s.carName, s.starts[next], next, pref)); } catch (err) { finish(next, { error: String(err) }); }
+          try { finish(next, optimizeTab(s.model, s.carName, s.starts[next], next, pref[next])); } catch (err) { finish(next, { error: String(err) }); }
         });
         onMain(queue);
       }, 30);
@@ -398,7 +424,7 @@ function partHint(game: GameData, code: string): string {
   return `Opens ${screens.join(', ')}. ${tuned}${extra} A higher level gives a wider range.`;
 }
 
-const BADGES = { set: 'To do', ok: 'Nothing to do', keep: 'Nothing to do', locked: 'Needs a part' } as const;
+const BADGES = { set: 'To do', ok: 'Already right', feel: 'Your choice', keep: 'Leave as is', locked: 'Needs a part' } as const;
 
 /** The chart's presses in words ("UP 3", "DOWN 1", "–") and its rows as rounds. Order as planHandInput: bar 1 to 9, round by round. */
 function pressWords(chart: CurveChart): CurveChart {
@@ -423,11 +449,12 @@ function whatIfLines(src: Source): Record<string, string> {
   return out;
 }
 
-function cards(src: Source, results: TabResult[], pref: Preference): TunerCardView[] {
+function cards(src: Source, results: TabResult[], goals: Preference[]): TunerCardView[] {
   const sign = (v: number | null, unit: string, digits: number): string => (v === null ? '–' : `${v > 0 ? '+' : ''}${v.toFixed(digits)} ${unit}`);
   const whatIf = whatIfLines(src);
   return groupTabs(results).map((group): TunerCardView => {
     const r = group[0], { a, b, diff } = r.plan;
+    const feelScreens = new Set(feelSliders(src.model, src.starts[r.setup], group.map((x) => x.setup)).map((f) => f.screen));
     const names = group.map((x) => TAB_NAMES[x.setup]);
     const now = gameNumbers(src.model.evaluate(r.start));
     const steps = tunerSteps(src.model, r, src.fromC).map((s) => (s.curve && s.passes?.length
@@ -435,8 +462,8 @@ function cards(src: Source, results: TabResult[], pref: Preference): TunerCardVi
     // "gap" = by hand minus the save, so a minus time or a plus speed means "by hand is better"
     const dkw = a.powerKw - b.powerKw;
     const table: HandRow[] = [
-      { label: '0-60', a: sec(a.t60), b: sec(b.t60), diff: sign(diff.t60, 's', 2), zero: diff.t60 === null || Math.abs(diff.t60) < 0.005 },
-      { label: '0-100', a: sec(a.t100), b: sec(b.t100), diff: sign(diff.t100, 's', 2), zero: diff.t100 === null || Math.abs(diff.t100) < 0.005 },
+      { label: '0-60 mph', a: sec(a.t60), b: sec(b.t60), diff: sign(diff.t60, 's', 2), zero: diff.t60 === null || Math.abs(diff.t60) < 0.005 },
+      { label: '0-100 mph', a: sec(a.t100), b: sec(b.t100), diff: sign(diff.t100, 's', 2), zero: diff.t100 === null || Math.abs(diff.t100) < 0.005 },
       { label: 'Top speed', a: kmh(a.topKmh), b: kmh(b.topKmh), diff: sign(diff.topKmh, 'km/h', 1), zero: Math.abs(diff.topKmh) < 0.05 },
       { label: 'Power', a: kw(a.powerKw), b: kw(b.powerKw), diff: sign(Number(dkw.toFixed(1)), 'kW', 1), zero: Math.abs(dkw) < 0.05 },
     ];
@@ -447,14 +474,16 @@ function cards(src: Source, results: TabResult[], pref: Preference): TunerCardVi
       uses: group.map((x) => ({ tab: TAB_NAMES[x.setup], career: TAB_USES[x.setup].career, quick: TAB_USES[x.setup].quick })),
       nowLabel: src.fromC ? 'After reset' : 'Now (save)',
       compare: [
-        { label: '0-60', now: sec(now.t60), after: sec(a.t60) },
-        { label: '0-100', now: sec(now.t100), after: sec(a.t100) },
+        { label: '0-60 mph', now: sec(now.t60), after: sec(a.t60) },
+        { label: '0-100 mph', now: sec(now.t100), after: sec(a.t100) },
         { label: 'Top speed', now: kmh(now.topKmh), after: kmh(a.topKmh) },
         { label: 'Power', now: kw(now.powerKw), after: kw(a.powerKw) },
       ],
-      goal: GOAL_WORDS[legalOptions(pref, r.setup).objective] ?? '',
+      goal: GOAL_WORDS[legalOptions(goals[r.setup], r.setup).objective] ?? '',
+      goals: goalChoices(r.setup),
+      goalKey: goals[r.setup],
       presses: steps.reduce((n, s) => n + s.presses, 0),
-      screens: screenPlans(src.model, group.map((x) => x.setup), steps, whatIf).map((x) => ({ ...x, badge: BADGES[x.state] })),
+      screens: screenPlans(src.model, group.map((x) => x.setup), steps, whatIf, feelScreens).map((x) => ({ ...x, badge: BADGES[x.state], hasFeel: feelScreens.has(x.name) })),
       note: group.some((x) => x.setup === 1) ? 'In Drag races you shift by hand. The dyno shifts by itself.' : '',
       table,
       // only the by-hand list: the optimizer's own sheet has its own entry rules ("do not reset the Drivetrain"), which

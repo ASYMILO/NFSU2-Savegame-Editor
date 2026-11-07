@@ -524,7 +524,7 @@ body {
 .tuner-prefs-box > p { font-size: 13px; color: var(--color-text); }
 .tuner-feel { display: grid; gap: 2px; padding: 8px 0; border-top: 1px solid var(--color-border); font-size: 13px; color: var(--color-text); }
 .tuner-feel-row { display: flex; align-items: center; gap: 10px; margin-top: 4px; }
-.tuner-feel-row span { flex: 0 0 140px; color: var(--color-text-muted); }
+.tuner-feel-row span { flex: 0 1 140px; min-width: 0; color: var(--color-text-muted); }
 .tuner-feel-row span:last-child { text-align: left; }
 .tuner-feel-row span:first-child { text-align: right; }
 .tuner-feel-row input { flex: 1 1 auto; max-width: 320px; accent-color: var(--color-primary); }
@@ -542,3 +542,25 @@ body {
 .tuner-feel small { display: block; margin-top: 2px; }
 .tuner-final h3 { margin: 0 0 8px; }
 .tuner-card .dyno-sheet { white-space: pre-wrap; }
+/* round 3g: phone width (390 px) keeps the sliders on the screen: slider on its own line, the two words under it */
+@media (max-width: 560px) {
+  .tuner-feel-row { flex-wrap: wrap; justify-content: space-between; gap: 4px; }
+  .tuner-feel-row input { order: -1; flex: 1 1 100%; max-width: none; }
+  .tuner-feel-row span, .tuner-feel-row span:first-child { flex: 0 1 48%; text-align: left; }
+  .tuner-feel-row span:last-child { text-align: right; }
+  .tuner-compare th, .tuner-compare td { padding-left: 4px; padding-right: 4px; }
+}
+.tuner-goal { display: grid; gap: 4px; margin: 8px 0 10px; font-size: 13px; color: var(--color-text); }
+.tuner-goal label { display: flex; gap: 6px; align-items: baseline; cursor: pointer; }
+.tuner-goal input { accent-color: var(--color-primary); }
+.tuner-legend { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; margin: 4px 0 0; font-size: 12px; color: var(--color-text); }
+.tuner-legend span { display: inline-block; width: 14px; height: 10px; }
+.tuner-legend .key-range { background: rgba(255, 90, 80, .18); border: 1px solid rgba(255, 90, 80, .7); }
+.tuner-legend .key-stock { height: 0; border-top: 2px solid #ffd34d; }
+.tuner-legend .key-value { background: rgba(80, 200, 200, .35); }
+.tuner-slot-row { margin-bottom: 6px; }
+.tuner-file, .tuner-kept { margin: 10px 0 0; font-size: 13px; }
+.tuner-uses-line { margin: 0 0 6px; }
+.tuner-why summary { font-size: 12px; color: var(--color-text-muted); cursor: pointer; }
+.tuner-screen.feel { font-size: 13px; }
+.tuner-screen.feel .tuner-badge { border-color: var(--color-green); color: var(--color-text-strong); }

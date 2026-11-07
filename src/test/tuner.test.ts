@@ -6,10 +6,11 @@ import { defaultSetup } from '../model/legal-opt.js';
 import type { SliderPlan } from '../model/hand-input.js';
 import { CurveScreen, NitroScreen, openRow, pressFinalDrive, pressRowState, resetRow, rowInfo } from '../model/tune-keys.js';
 import {
-  categoryScreens, curveKeys, groupTabs, legalOptions, menuOrder, planTab, RESET, SCREEN_ORDER, screenPlans, startAfterC, tunerSteps, unlockParts, type TabResult,
+  categoryScreens, curveKeys, goalChoices, groupTabs, legalOptions, menuOrder, planTab, RESET, SCREEN_ORDER, screenPlans, startAfterC, tunerSteps, unlockParts, type TabResult,
 } from '../model/tuner.js';
 import { PERF_PARTS } from '../data/perf-parts.js';
 import { installedForLevels, withAero } from '../model/virtual-save.js';
+import { parsePrefs } from '../controller/browser-store.js';
 
 const GAME_BUN = process.env.NFSU2_GLOBALB ?? 'C:/Program Files (x86)/EA GAMES/Need for Speed Underground 2/GLOBAL/GLOBALB.BUN';
 const SKIP = !existsSync(GAME_BUN) && 'GLOBALB.BUN (set NFSU2_GLOBALB) missing';
@@ -19,9 +20,22 @@ const cases = (JSON.parse(readFileSync(new URL('../../src/test/fixtures/dyno-exa
 test('preferences map to the existing objectives; the launch rule only with "strong start"', () => {
   assert.deepEqual(legalOptions('race', 0), { objective: 'circuit', launchMin: null });
   assert.deepEqual(legalOptions('race', 4), { objective: 'url', launchMin: null });
-  assert.deepEqual(legalOptions('launch', 1), { objective: 'drag', launchMin: 0.9 });
   assert.deepEqual(legalOptions('accel', 0), { objective: 'streetx', launchMin: null });
   assert.deepEqual(legalOptions('top', 2), { objective: 'url', launchMin: null });
+});
+
+test('each tab offers its own goal first and no goal twice (Street X = acceleration, URL = top speed)', () => {
+  assert.deepEqual(goalChoices(0).map((g) => g.key), ['race', 'accel', 'top']);
+  assert.deepEqual(goalChoices(3).map((g) => g.key), ['race', 'top']);
+  assert.deepEqual(goalChoices(4).map((g) => g.key), ['race', 'accel']);
+  for (let setup = 0; setup < 5; setup++) assert.ok(goalChoices(setup).every((g) => g.text), `tab ${setup}: every goal has words`);
+});
+
+test('stored Tuner choices: malformed parts are dropped, slider positions clamped, no other keys kept', () => {
+  assert.equal(parsePrefs('not json', ['race'], ['stiff']), null);
+  const p = parsePrefs(JSON.stringify({ how: 'hand', goals: ['top', 'bogus'], feels: [{ stiff: 250, other: 5 }, null], save: [1, 2] }), ['race', 'top'], ['stiff'])!;
+  assert.deepEqual(p, { how: 'hand', goals: ['top', 'race', 'race', 'race', 'race'], feels: [{ stiff: 100 }, {}, {}, {}, {}] });
+  assert.equal(parsePrefs('{"how":"x"}', ['race'], [])!.how, 'save');
 });
 
 test('tabs with the same start, keys and result share a card', () => {
@@ -100,10 +114,39 @@ test('no save: every step starts with C, and every curve and drivetrain row Opti
     // key C on a row of the start changes nothing: the start is the state after C
     for (const param of model.gearingParameters) assert.deepEqual(Array.from(resetRow(model, start, param).setup), Array.from(start), `${car.name}: row ${param}`);
     const steps = tunerSteps(model, planTab(model, 0, start, target(model, start), 'race'), true);
-    for (const s of steps) assert.ok(s.keys.startsWith(RESET), `${car.name}: ${s.screen} ${s.row}`);
+    // Drivetrain: one first step puts every row back with C (a later C on a row a gear key pushed would undo the push);
+    // its other steps are the plan's own keys. Every other step starts with C.
+    const open = model.gearingParameters.filter((p) => rowInfo(model, start, p));
+    const drive = steps.filter((s) => s.screen === 'Drivetrain');
+    if (open.length) assert.equal(drive[0]?.row, 'Every row first', `${car.name}: reset step first`);
+    if (open.length) assert.equal(drive[0].presses, open.length, `${car.name}: every open row gets its C`);
+    for (const s of steps) if (s.screen !== 'Drivetrain' || s === drive[0]) assert.ok(s.keys.startsWith(RESET), `${car.name}: ${s.screen} ${s.row}`);
     const curves = (['ecu', 'turbo'] as const).filter((k) => model.curve(start, k)).length;
-    assert.ok(steps.length >= curves + model.gearingParameters.filter((p) => rowInfo(model, start, p)).length, `${car.name}: rows missing`);
+    assert.ok(steps.filter((s) => s.curve || s.row === 'Bars').length >= curves, `${car.name}: curves missing`);
   }
+});
+
+test('Drivetrain steps read like the screen: 1st..6th Gear, then Final Drive Ratio', { skip: SKIP }, () => {
+  const game = parseGameData(new Uint8Array(readFileSync(GAME_BUN)));
+  let checked = 0;
+  for (const c of cases) {
+    const car = findCar(game, c.hash >>> 0)!;
+    const model = new DynoModel(game, car, c.installed.map((b) => b !== 0), c.uniques);
+    if (!model.gearingParameters.includes(10)) continue;
+    for (const start of [Uint8Array.from(c.setup), startAfterC(model)]) {
+      const t = target(model, start);
+      for (const p of [10, 12, 14]) if (rowInfo(model, t, p)) t[p] = Math.max(0, t[p] - 25);
+      const rows = menuOrder(planTab(model, 0, start, t, 'race').plan.plans).filter((p) => p.screen === 'Drivetrain')
+        .map((p) => p.row?.param ?? 9);
+      const fd = rows.indexOf(9);
+      if (fd >= 0) assert.equal(fd, rows.length - 1, `${car.name}: final drive last (${rows})`);
+      // top to bottom once, and at most a second round (a gear key pushed a neighbour)
+      const gears = rows.filter((p) => p !== 9);
+      assert.ok(gears.filter((p, i) => i > 0 && p <= gears[i - 1]).length <= 1, `${car.name}: gears in order (${rows})`);
+      checked++;
+    }
+  }
+  assert.ok(checked >= 2, `only ${checked} 6-speed plans`);
 });
 
 test('which part opens which screen comes from the game\'s tuning records', { skip: SKIP }, () => {

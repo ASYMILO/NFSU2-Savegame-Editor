@@ -12,8 +12,10 @@
     <div class="editor-header-inner">
       <div class="editor-brand">
         <p class="landing-eyebrow">NEED FOR SPEED UNDERGROUND 2</p>
-        <h1>Career Save Editor</h1>
-        <p class="editor-description">Your garage. Your rules. Edit locally, then download your save.</p>
+        <h1 ng-show="view !== 'tuner'">Career Save Editor</h1>
+        <p class="editor-description" ng-show="view !== 'tuner'">Your garage. Your rules. Edit locally, then download your save.</p>
+        <h1 ng-show="view === 'tuner'" class="ng-hide">Tuner</h1>
+        <p class="editor-description ng-hide" ng-show="view === 'tuner'">The best setup for each race type, from the game's own numbers.</p>
       </div>
       <div class="editor-build">
         <span class="build-badge" title="Build number: UTC date and time (YYYYMMDDhhmmss)">v__APP_VERSION__ &middot; Build __BUILD_NUMBER__</span>
@@ -24,27 +26,24 @@
 
   <main class="editor-main tuner-main" ng-show="view === 'tuner'">
     <p class="tuner-back"><button type="button" class="profile-action-btn" ng-click="tunerBack()">← Back to the save editor</button></p>
-    <section class="profile-section">
+    <section class="profile-section" ng-if="!tuning.dyno.gameName">
       <h3>1. Game file</h3>
-      <div ng-if="!tuning.dyno.gameName">
-        <p>The Tuner reads your car data from one file of your game, <code>GLOBALB.BUN</code>. The file stays in this browser.</p>
-        <p class="message" ng-if="tuning.dyno.localMissing">We did not find the game file next to this page. Choose it yourself:
-          open your Need for Speed Underground 2 folder, then the folder <code>GLOBAL</code>, then pick <code>GLOBALB.BUN</code>.</p>
-        <div class="editor-row">
-          <label class="profile-action-btn dyno-file tuner-go">
-            Choose the game file
-            <input type="file" accept=".bun,.BUN" nfsu-file-change="loadGameData">
-          </label>
-        </div>
+      <p>The Tuner reads your car data from one file of your game, <code>GLOBALB.BUN</code>. Pick it once: this browser keeps it for your next visit. It is not uploaded.</p>
+      <p class="muted">Where: your Need for Speed Underground 2 folder, then the folder <code>GLOBAL</code>, then <code>GLOBALB.BUN</code>.</p>
+      <div class="editor-row">
+        <label class="profile-action-btn dyno-file tuner-go">
+          Choose the game file
+          <input type="file" accept=".bun,.BUN" nfsu-file-change="rememberGameFile">
+        </label>
       </div>
-      <p class="tuner-done" ng-if="tuning.dyno.gameName">Game file: loaded.</p>
+      <p class="muted" ng-if="tuning.dyno.forgotten">Forgotten. This browser no longer keeps the game file.</p>
       <p class="message error" ng-if="tuning.dyno.gameError">{{ tuning.dyno.gameError }}</p>
     </section>
 
     <section class="profile-section" ng-if="tuning.dyno.gameName">
-      <h3>2. Your car</h3>
+      <h3>{{ tuner.source === 'save' ? 'Your car' : '1. Your car' }}</h3>
       <div ng-if="tuner.source === 'save'">
-        <p class="muted">From your save {{ fileName }}. It is only read here. At the end you can download a changed copy.</p>
+        <p class="muted">From your save {{ fileName }}. It is only read here. You can download a changed copy at the end.</p>
         <div class="dyno-controls">
           <label ng-if="backup">Profile
             <select ng-model="backup.current" ng-change="selectProfile(backup.current)"
@@ -78,10 +77,12 @@
         </details>
       </div>
       <p class="message" ng-if="tuner.error">{{ tuner.error }}</p>
+      <p class="muted tuner-file">Game file: loaded<span ng-if="tuning.dyno.remembered">, kept in this browser</span>.
+        <button type="button" class="link-btn" ng-if="tuning.dyno.remembered" ng-click="forgetGameFile()">Forget the file</button></p>
     </section>
 
     <section class="profile-section" ng-if="tuner.now">
-      <h3>3. Your car now: {{ tuner.now.carName }}</h3>
+      <h3>{{ tuner.now.carName }} now</h3>
       <div class="tuner-logo" ng-if="tunerLogo()">
         <img ng-src="./game/logos/{{ tunerLogo() }}.png" alt="{{ tunerLogo() }}" onload="this.parentNode.hidden=false" onerror="this.parentNode.hidden=true">
       </div>
@@ -90,34 +91,24 @@
       <p class="muted" ng-if="tuner.now.missing.length">Not installed: {{ tuner.now.missing.join(', ') }}.</p>
       <div class="tuner-scroll">
         <table class="tuner-compare">
-          <thead><tr><th>Dyno</th><th>0-60</th><th>0-100</th><th>Top speed</th><th>Power</th></tr></thead>
+          <thead><tr><th>Dyno</th><th>0-60 mph</th><th>0-100 mph</th><th>Top speed</th><th>Power</th></tr></thead>
           <tbody><tr ng-repeat="row in tuner.now.dyno track by row.tab"><th scope="row">{{ row.tab }}</th><td>{{ row.t60 }}</td><td>{{ row.t100 }}</td><td>{{ row.top }}</td><td>{{ row.power }}</td></tr></tbody>
         </table>
       </div>
-      <p class="muted">Numbers as the game's Dyno Results screen shows them.<span ng-if="tuner.source === 'list'"> No save: this is the factory setting, what the C key (back to default) gives in the game.</span></p>
-      <details class="hand-older" ng-if="tuner.now.settings.length">
-        <summary>Slider values now</summary>
-        <div class="tuner-scroll">
-          <table class="dyno-table tuner-now-settings">
-            <thead><tr><th>Screen</th><th>Row</th><th ng-repeat="c in tuner.now.columns track by c">{{ c }}</th></tr></thead>
-            <tbody><tr ng-repeat="s in tuner.now.settings track by $index"><td>{{ s.screen }}</td><td>{{ s.row }}</td><td ng-repeat="v in s.values track by $index">{{ v }}</td></tr></tbody>
-          </table>
-        </div>
-        <p class="muted">ECU and Turbo are bar graphs; you see them on the result cards.</p>
-      </details>
+      <p class="muted">As the game's Dyno Results screen shows them. Its 0-60 and 0-100 are in mph, also when the game is set to km/h.<span ng-if="tuner.source === 'list'"> No save: this is the factory setting, what the C key (back to default) gives in the game.</span></p>
       <p class="message" ng-if="tuner.now.problem">{{ tuner.now.problem }}</p>
     </section>
 
     <section class="profile-section" ng-if="tuner.now && !tuner.now.problem">
-      <h3>4. Find the best setup</h3>
+      <h3>Find the best setup</h3>
       <div class="hand-mode tuner-source" role="radiogroup" aria-label="How you set the result" ng-if="tuner.source === 'save'">
         <label ng-class="{ on: tuner.how === 'save' }">
-          <input type="radio" name="tunerhow" value="save" ng-model="tuner.how">
+          <input type="radio" name="tunerhow" value="save" ng-model="tuner.how" ng-change="tunerHow()">
           <span class="hand-mode-name">Write it into my save</span>
           <span class="hand-mode-note">The exact best. You download a changed copy and load it in the game. No keys to press.</span>
         </label>
         <label ng-class="{ on: tuner.how === 'hand' }">
-          <input type="radio" name="tunerhow" value="hand" ng-model="tuner.how">
+          <input type="radio" name="tunerhow" value="hand" ng-model="tuner.how" ng-change="tunerHow()">
           <span class="hand-mode-name">Set it by hand in the game</span>
           <span class="hand-mode-note">Your save stays as it is. We list the keys to press on each tuning screen. Keys cannot always reach the exact best.</span>
         </label>
@@ -133,18 +124,14 @@
     </section>
 
     <section class="profile-section" ng-if="tuner.cards.length">
-      <h3>5. {{ tuner.how === 'save' ? 'Your best setup' : 'Set it in the game' }}: {{ tuner.carName }}</h3>
+      <h3>{{ tuner.how === 'save' ? 'Your best setup' : 'Set it in the game' }}: {{ tuner.carName }}</h3>
       <p class="message error" ng-if="tuner.stale">The save changed. Press “Find best setup” again.</p>
-      <div class="editor-row" ng-if="tuner.how === 'save' && tuner.canDownload">
-        <button type="button" class="profile-action-btn tuner-go" ng-click="tunerDownload()" ng-disabled="tuner.stale || tuner.busy">Download changed save</button>
-        <span class="muted">A copy with the best setup of all 5 race types. Load it in the game. Your loaded file is not changed. Keep your original backup.</span>
-      </div>
       <ol class="tuner-intro" ng-if="tuner.how === 'hand'">
         <li>In the game's Garage open “Performance Tuning / Dyno”, pick the race type of the tab below, then “Tune Settings”.</li>
         <li>Go through the screens below from top to bottom. Tick each line when it is done.</li>
+        <li><strong>C key = back to default.</strong> On a screen with sliders it puts back only the row you are on. On ECU and Turbo it puts back all 9 bars.
+          <span ng-if="tuner.fromC">No save: we do not know where your sliders are now, so every screen starts with C.</span></li>
       </ol>
-      <p class="tuner-reset" ng-if="tuner.how === 'hand'"><strong>C key = back to default.</strong> On a screen with sliders it puts back only the row you are on. On ECU and Turbo it puts back all 9 bars.
-        <span ng-if="tuner.fromC">No save: we do not know where your sliders are now, so each line starts with C.</span></p>
       <div class="dyno-setups tuner-tabs" role="tablist" aria-label="Race types">
         <button type="button" role="tab" ng-repeat="tab in tuner.tabs track by tab.name" ng-class="{ active: tuner.card === tab.card }"
                 ng-attr-aria-selected="{{ tuner.card === tab.card ? 'true' : 'false' }}" ng-click="tunerTab(tab.card)">
@@ -153,31 +140,36 @@
       </div>
       <article class="hand-card tuner-card" ng-repeat="card in tuner.cards track by card.title" ng-if="tuner.card === $index">
         <h3>{{ card.title }}</h3>
-        <div class="tuner-scroll">
-          <table class="tuner-uses">
-            <thead><tr><th ng-if="card.uses.length > 1">Tab</th><th>Career races</th><th>Quick Race</th></tr></thead>
-            <tbody><tr ng-repeat="u in card.uses track by u.tab"><th scope="row" ng-if="card.uses.length > 1">{{ u.tab }}</th><td>{{ u.career }}</td><td>{{ u.quick }}</td></tr></tbody>
-          </table>
-        </div>
+        <p class="muted tuner-uses-line"><span ng-repeat="u in card.uses track by u.tab"><span ng-if="card.uses.length > 1">{{ u.tab }}: </span>career {{ u.career }}; Quick Race {{ u.quick }}.{{ $last ? '' : ' ' }}</span></p>
         <p class="tuner-same" ng-if="card.setups.length > 1">Same steps for {{ card.title }}: set each of them the same way.</p>
-        <p class="muted" ng-if="card.goal">Best here means: {{ card.goal }}. That is our choice; the game has no score for a setup.</p>
+        <div class="tuner-goal" role="radiogroup" aria-label="What counts most in this race">
+          <strong>What counts most here</strong>
+          <label ng-repeat="g in card.goals track by g.key">
+            <input type="radio" name="tunergoal{{ $parent.$index }}" ng-value="g.key" ng-model="card.goalKey" ng-change="tunerGoal(g.key)" ng-disabled="tuner.busy">
+            {{ g.label }} <span class="muted">({{ g.text }})</span>
+          </label>
+        </div>
         <div class="tuner-scroll">
           <table class="tuner-compare">
-            <thead><tr><th>Dyno</th><th>{{ card.nowLabel }}</th><th>Set by hand</th><th>Downloaded save</th><th>Gap</th></tr></thead>
-            <tbody><tr ng-repeat="row in card.compare track by row.label"><th scope="row">{{ row.label }}</th><td>{{ row.now }}</td><td ng-class="{ 'tuner-pick': tuner.how === 'hand' }">{{ row.after }}</td>
-              <td ng-class="{ 'tuner-pick': tuner.how === 'save' }">{{ card.table[$index].b }}</td><td ng-class="{ muted: card.table[$index].zero }">{{ card.table[$index].diff }}</td></tr></tbody>
+            <thead><tr><th>Dyno</th><th>{{ card.nowLabel }}</th><th ng-if="tuner.how === 'hand'">By hand</th><th>{{ tuner.how === 'hand' ? 'Save would give' : 'In the save' }}</th></tr></thead>
+            <tbody><tr ng-repeat="row in card.compare track by row.label"><th scope="row">{{ row.label }}</th><td>{{ row.now }}</td>
+              <td ng-if="tuner.how === 'hand'" class="tuner-pick">{{ row.after }}</td>
+              <td ng-class="{ 'tuner-pick': tuner.how === 'save', muted: tuner.how === 'hand' }">{{ card.table[$index].b }}</td></tr></tbody>
           </table>
         </div>
-        <p class="muted">“Set by hand” = after the keys of step 5. “Downloaded save” = the exact best, written straight into a save; the game's keys
-          cannot always reach it. Gap = by hand minus save: +0.02 s means by hand is 0.02 s slower.</p>
+        <p class="muted" ng-if="tuner.how === 'hand'">“By hand” = after the keys below. “Save would give” = the exact best, written straight into a save; the game's keys cannot always reach it.</p>
         <p class="muted" ng-if="card.note">{{ card.note }}</p>
-        <p class="muted" ng-if="tuner.how === 'save'">Your choice: the save. To set it by hand instead, pick “Set it by hand in the game” in step 4.</p>
-        <div ng-if="tuner.how === 'hand'">
-        <div class="tuner-screen" ng-repeat="scr in card.screens track by scr.name" ng-class="scr.state">
+        <div class="editor-row" ng-if="tuner.how === 'save' && tuner.canDownload">
+          <button type="button" class="profile-action-btn tuner-go" ng-click="tunerDownload()" ng-disabled="tuner.stale || tuner.busy">Download changed save</button>
+          <span class="muted">One copy with all 5 race types and your driving sliders. Load it in the game. Your loaded file is not changed. Keep your original backup.</span>
+        </div>
+        <p class="muted" ng-if="tuner.how === 'save'">The game's screens, with your optional driving sliders:</p>
+        <div class="tuner-screen" ng-repeat="scr in card.screens track by scr.name" ng-class="scr.state"
+             ng-if="tuner.how === 'hand' || scr.hasFeel">
           <p class="tuner-screen-head"><strong>{{ scr.name }}</strong>
-            <span class="tuner-badge">{{ scr.badge }}</span>
-            <span class="muted" ng-if="scr.text">{{ scr.text }}</span></p>
-          <div class="tuner-step" ng-repeat="step in scr.steps track by $index" ng-class="{ done: step.done }">
+            <span class="tuner-badge" ng-if="tuner.how === 'hand'">{{ scr.badge }}</span>
+            <span class="muted" ng-if="scr.text && tuner.how === 'hand'">{{ scr.text }}</span></p>
+          <div class="tuner-step" ng-if="tuner.how === 'hand'" ng-repeat="step in scr.steps track by $index" ng-class="{ done: step.done }">
             <label class="tuner-check"><input type="checkbox" ng-model="step.done">
               <span><strong>{{ step.row }}</strong>: press {{ step.keys }}.<span ng-if="step.shows"> Then it shows <strong>{{ step.shows }}</strong><span class="muted" ng-if="step.from && step.from !== step.shows"> (now {{ step.from }})</span>.</span></span></label>
             <svg class="dyno-graph" role="img" ng-if="step.chart" ng-attr-view_box="0 0 {{ step.chart.width }} {{ step.chart.height + 16 }}"
@@ -202,6 +194,8 @@
               <text class="dyno-axis" ng-repeat="label in step.chart.passLabels track by $index" x="2" ng-attr-y="{{ step.chart.bottom + 48 + $index * 14 }}">{{ label }}</text>
               <text class="dyno-axis" x="2" ng-attr-y="{{ step.chart.bottom + 30 }}">Revs</text>
             </svg>
+            <p class="tuner-legend" ng-if="step.chart"><span class="key-range"></span> how far the bar can go with your parts
+              <span class="key-stock"></span> factory value <span class="key-value"></span> the bar after your presses</p>
             <ol class="tuner-howto" ng-if="step.chart">
               <li>Open the screen. Bar 1 (left) is picked. Press C: all 9 bars go back to default.</li>
               <li>On each bar press UP or DOWN as many times as it says (– = none), then RIGHT to the next bar.</li>
@@ -209,49 +203,24 @@
               <li>Stop after the last bar with presses.</li>
             </ol>
           </div>
-        </div>
-        <details class="hand-older">
-          <summary>All keys as a list</summary>
-          <p class="muted">{{ card.presses }} key presses in all.</p>
-          <pre class="dyno-sheet">{{ card.sheet }}</pre>
-        </details>
-        </div>
-      </article>
-
-      <div class="tuner-prefs-box">
-        <button type="button" class="tuner-fold" ng-click="tuner.prefsOpen = !tuner.prefsOpen" ng-attr-aria-expanded="{{ tuner.prefsOpen ? 'true' : 'false' }}">
-          {{ tuner.prefsOpen ? '▾' : '▸' }} Your preferences: change after you tried it</button>
-        <div ng-show="tuner.prefsOpen">
-          <p><strong>Goal</strong> (all race types). Changing it works the setup out again.</p>
-          <div class="tuner-prefs" role="radiogroup" aria-label="Goal">
-            <label ng-repeat="p in tuner.prefs track by p.key">
-              <input type="radio" name="tunerpref" ng-value="p.key" ng-model="tuner.pref" ng-change="tunerPref()" ng-disabled="tuner.busy">
-              <strong>{{ p.label }}</strong> <span class="muted">{{ p.text }}</span>
-            </label>
-          </div>
-          <p class="tuner-feel-head"><strong>How the car feels</strong> (this race type: {{ tuner.cards[tuner.card].title }}). The dyno does not measure this, so there is no best value.
-            Not sure? Leave them in the middle (= as now). Move one only if the car feels wrong to you in a race; the steps above change at once.</p>
-          <p class="muted" ng-if="!tuner.sliders.length">Nothing to change here: buy suspension, brake, tire, nitrous or body-shop aero parts first.</p>
-          <div class="tuner-feel" ng-repeat="s in tuner.sliders track by s.key">
+          <div class="tuner-feel" ng-repeat="s in tuner.sliders | filter:{ screen: scr.name }:true track by s.key">
             <label><strong>{{ s.label }}</strong>
               <span class="tuner-feel-row"><span>{{ s.low }}</span>
                 <input type="range" ng-attr-min="{{ s.min }}" ng-attr-max="{{ s.max }}" step="25" ng-model="tuner.feel[s.key]" ng-model-options="{ updateOn: 'change' }" ng-change="tunerFeel()" ng-disabled="tuner.busy" aria-label="{{ s.label }}: {{ s.low }} to {{ s.high }}">
                 <span>{{ s.high }}</span></span></label>
             <small>{{ s.when }}<span class="muted" ng-if="s.limit"> {{ s.limit }}</span></small>
-            <small class="muted">{{ s.screen }} screen. {{ s.basis }}</small>
+            <details class="tuner-why"><summary>What it changes</summary><small class="muted">{{ s.basis }}</small></details>
           </div>
         </div>
-      </div>
-
-      <div class="tuner-final" ng-if="tuner.how === 'hand'">
-        <h3>6. Or: download a changed save</h3>
-        <div class="editor-row" ng-if="tuner.canDownload">
-          <button type="button" class="profile-action-btn tuner-go" ng-click="tunerDownload()" ng-disabled="tuner.stale || tuner.busy">Download changed save</button>
-          <span class="muted">A copy with the exact best setup of all 5 race types, your preferences included. Load it in the game instead of setting it by hand.
-            Your loaded file is not changed. Keep your original backup.</span>
-        </div>
-        <p class="muted" ng-if="!tuner.canDownload">This needs your save: go back to the save editor, load your save and press “Best setup (Tuner)…” on your car.</p>
-      </div>
+        <details class="hand-older" ng-if="tuner.how === 'hand'">
+          <summary>All keys as a list</summary>
+          <p class="muted">{{ card.presses }} key presses in all.</p>
+          <pre class="dyno-sheet">{{ card.sheet }}</pre>
+        </details>
+      </article>
+      <p class="muted tuner-kept">This browser keeps your choices (save or by hand, goals, sliders), not your save.
+        <button type="button" class="link-btn" ng-click="tunerForgetPrefs()" ng-disabled="tuner.busy">Forget my choices</button></p>
+      <p class="muted" ng-if="tuner.how === 'hand' && !tuner.canDownload">With your save you could also download a changed copy: go back to the save editor, load your save and press “Best setup (Tuner)…” on your car.</p>
     </section>
   </main>
 
@@ -361,10 +330,12 @@
             {{ slot.trafficName ? slot.trafficName + ' (experimental traffic)' : (slot.car ? slot.car.name : 'Unknown car') }}
           </p>
           <p class="slot-car-name muted" ng-if="slot.state === 'open'">Open for a sponsor car</p>
+          <div class="bike-actions tuner-slot-row" ng-if="slot.state === 'filled' && !slot.trafficName">
+            <button type="button" class="profile-action-btn tuner-go" ng-click="openTuner(slot.index)">Best setup (Tuner)…</button>
+          </div>
           <div class="bike-actions">
             <button type="button" class="profile-action-btn" ng-click="toggleLock(slot.index)">{{ slot.state === 'locked' ? 'Unlock slot' : 'Lock slot' }}</button>
             <button type="button" class="profile-action-btn" ng-if="slot.state === 'filled'" ng-click="openTuning(slot.index)">Tuning…</button>
-            <button type="button" class="profile-action-btn tuner-go" ng-if="slot.state === 'filled' && !slot.trafficName" ng-click="openTuner(slot.index)">Best setup (Tuner)…</button>
             <button type="button" class="profile-action-btn" ng-if="slot.state === 'filled'" ng-click="toggleUnlocks(slot.index)">{{ slot.unlocked === unlockTotal ? 'Lock parts' : 'Unlock parts' }}</button>
           </div>
           <div class="bike-actions slot-operation">

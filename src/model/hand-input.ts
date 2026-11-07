@@ -31,7 +31,7 @@ export interface SliderPlan {
   reached?: number[];
   wanted?: number[];
   /** Number sliders: what the screen shows, so the plan reads like the game (see {@link rowPlanner}). */
-  row?: { param: number; label: string; saved: string; wanted: string; reached: string; again: boolean };
+  row?: { param: number; label: string; saved: string; wanted: string; reached: string; again: boolean; ends?: boolean[] };
 }
 
 /** What a planner may know besides the setups: which rows the owner typed a number for (they are not the optimizer's). */
@@ -200,8 +200,11 @@ function walk(model: DynoModel, info: RowInfo, start: RowState): Map<string, Nod
   return seen;
 }
 
-/** How a path reads in the game: `C` first (or not), then runs of RIGHT (+n) and LEFT (-n). */
-export interface Route { useC: boolean; runs: number[]; presses: number; setup: Uint8Array }
+/**
+ * How a path reads in the game: `C` first (or not), then runs of RIGHT (+n) and LEFT (-n). `ends[i]`: run i stops at the end
+ * of the box (one more key that way changes nothing), so the next run starts from the end's grid (the grid shifts there).
+ */
+export interface Route { useC: boolean; runs: number[]; presses: number; setup: Uint8Array; ends?: boolean[] }
 
 function runsOf(keys: Key[]): number[] {
   const runs: number[] = [];
@@ -230,7 +233,7 @@ export function routeToByte(model: DynoModel, setup: ArrayLike<number>, param: n
   const starts: { st: RowState; c: boolean }[] = [];
   if (useC !== 'only') starts.push({ st: openRow(model, setup), c: false });
   if (useC !== 'never') starts.push({ st: resetRow(model, setup, param), c: true });
-  let best: { route: Route; d: number; dd: number } | null = null;
+  let best: { route: Route; d: number; dd: number; from: RowState } | null = null;
   for (const { st, c } of starts) {
     for (const node of walk(model, info, st).values()) {
       const b = node.st.setup[param];
@@ -238,10 +241,50 @@ export function routeToByte(model: DynoModel, setup: ArrayLike<number>, param: n
       const route: Route = { useC: c, runs: runsOf(node.keys), presses: node.keys.length + (c ? 1 : 0), setup: node.st.setup };
       const off = (x: number): number => (x > slack ? x : 0);
       if (!best || off(d) < off(best.d) || (off(d) === off(best.d) && (route.presses < best.route.presses
-        || (route.presses === best.route.presses && (dd < best.dd || (dd === best.dd && !route.useC && best.route.useC)))))) best = { route, d, dd };
+        || (route.presses === best.route.presses && (dd < best.dd || (dd === best.dd && !route.useC && best.route.useC)))))) best = { route, d, dd, from: st };
     }
   }
-  return best?.route ?? null;
+  if (!best) return null;
+  // which runs stop at an end of the box: replay them and try one key more
+  let st: RowState | null = best.from;
+  best.route.ends = best.route.runs.map((n) => {
+    const dir = n > 0 ? 1 : -1;
+    for (let k = 0; k < Math.abs(n) && st; k++) st = pressRowState(model, info, st, dir);
+    if (!st) return false;
+    // at the end a key changes no byte any more (the screen's float may still move a hair)
+    const more = pressRowState(model, info, st, dir);
+    return !more || more.setup.every((b, i) => b === st!.setup[i]);
+  });
+  return best.route;
+}
+
+/** At most this many presses more for a path in one direction than for the shortest path that turns back. */
+const STRAIGHT_EXTRA = 2;
+
+/**
+ * A path in one direction (C or not, then only RIGHT or only LEFT) whose setup gives the same dyno numbers as `route`'s,
+ * as the game's Dyno Results screen shows them (0-60, 0-100, quarter mile to 0.01 s, top speed to 0.1 km/h); null if none.
+ */
+function straightRoute(model: DynoModel, setup: ArrayLike<number>, param: number, route: Route): Route | null {
+  const info = rowInfo(model, setup, param);
+  if (!info) return null;
+  const key = (s: Uint8Array): string => { const g = gameNumbers(model.evaluate(s)); return [g.t60, g.t100, g.quarter, g.topKmh.toFixed(1)].join('|'); };
+  const want = key(route.setup);
+  let best: Route | null = null;
+  for (const c of [false, true]) {
+    const from = c ? resetRow(model, setup, param) : openRow(model, setup);
+    if (c && key(from.setup) === want) best = best && best.presses <= 1 ? best : { useC: true, runs: [], presses: 1, setup: from.setup, ends: [] };
+    for (const dir of [1, -1] as const) {
+      let st: RowState | null = from;
+      for (let n = 1; st; n++) {
+        const presses = n + (c ? 1 : 0);
+        if (presses > route.presses + STRAIGHT_EXTRA || (best && presses >= best.presses)) break;
+        st = pressRowState(model, info, st, dir);
+        if (st && key(st.setup) === want) { best = { useC: c, runs: [dir * n], presses, setup: st.setup, ends: [false] }; break; }
+      }
+    }
+  }
+  return best;
 }
 
 /** The nitrous slider: one number, only RIGHT / LEFT from the value you have (key C is not modelled, see NitroScreen). */
@@ -293,7 +336,10 @@ export function rowPlanner(param: number, again = false): SliderPlanner {
     if (pair.every((i) => current[i] === target[i])) return null;
     // a number the owner typed is reached when the screen shows it (any byte that reads the same); the optimizer's own rows may stop a byte short
     const slack = ctx.manual.has(param) ? 0 : SLACK_BYTES;
-    const route = param === 16 ? routeNitro(model, current, target[16], slack) : routeToByte(model, current, param, target[param], slack, 'auto', ctx.manual.has(param) && !ctx.exact.has(param));
+    let route = param === 16 ? routeNitro(model, current, target[16], slack) : routeToByte(model, current, param, target[param], slack, 'auto', ctx.manual.has(param) && !ctx.exact.has(param));
+    // a path that turns back ("LEFT 14, then RIGHT 3") reads oddly; one way only is taken when the dyno shows the same numbers
+    // (gears only: the dyno does not see the driving rows, so for them "same numbers" says nothing)
+    if (route && route.runs.length > 1 && param >= 10 && param <= 15 && !ctx.manual.has(param)) route = straightRoute(model, current, param, route) ?? route;
     if (!route || route.presses === 0) return null;
     // the key path of an unlocked row only; nothing to do when the best path ends where it started
     if (pair.every((i) => route.setup[i] === current[i]) && !route.useC) return null;
@@ -303,7 +349,7 @@ export function rowPlanner(param: number, again = false): SliderPlanner {
       passes: route.runs.length ? route.runs.map((n) => [n]) : [[0]], presses: route.presses, setup: route.setup,
       row: {
         param, label, saved: shownText(model, current, param), wanted: shownText(model, target, param),
-        reached: shownText(model, route.setup, param), again,
+        reached: shownText(model, route.setup, param), again, ends: route.ends,
       },
     };
   };
@@ -312,8 +358,12 @@ export function rowPlanner(param: number, again = false): SliderPlanner {
 const ROW_PLANNERS = ROW_ORDER.map((p) => rowPlanner(p));
 const GEAR_AGAIN = [10, 11, 12, 13, 14, 15].map((p) => rowPlanner(p, true));
 
-/** The screens a plan covers, in the order the owner works through the game's menu. */
-export const SLIDER_PLANNERS: SliderPlanner[] = [curvePlanner('ecu'), curvePlanner('turbo'), finalDrivePlanner, ...ROW_PLANNERS, ...GEAR_AGAIN];
+/**
+ * The screens a plan covers. On the Drivetrain screen the game lists 1st..6th Gear, then Final Drive Ratio (tuner repo
+ * docs/game-input-rules.md "Gearbox level 3 screen"), so the gears are planned first and the final drive last: the steps read
+ * top to bottom like the screen, and the final drive is picked with the gears as set.
+ */
+export const SLIDER_PLANNERS: SliderPlanner[] = [curvePlanner('ecu'), curvePlanner('turbo'), ...ROW_PLANNERS, ...GEAR_AGAIN, finalDrivePlanner];
 
 /**
  * Mode A for an optimum.

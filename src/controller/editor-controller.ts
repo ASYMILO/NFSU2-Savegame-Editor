@@ -29,6 +29,7 @@ import { formatHandPlan, handSteps, planHandInput, ROW_LABELS, ROW_ORDER, shownT
 import { NitroScreen, rowInfo, rowScale, setRowShown } from '../model/tune-keys.js';
 import { buildVirtualSave, installedForLevels, PART_LEVEL_CATEGORIES } from '../model/virtual-save.js';
 import { attachTuner } from './tuner-controller.js';
+import { forgetGame, recallGame, rememberGame } from './browser-store.js';
 
 const partsByIndex = new Map<number, PerfPart>(PERF_PARTS.map((p) => [p.index, p]));
 const tuningPerfIndexSet = new Set(TUNING_PERF_INDICES);
@@ -832,14 +833,26 @@ export function EditorController($scope: EditorScope): void {
     reader.readAsArrayBuffer(file);
   };
 
-  // The local server (serve_editors.sh) offers the owner's own copy at ./game/GLOBALB.BUN; a published site does not, and
-  // the file picker stays the way in. Nothing of the game is stored in this repository.
-  fetch('./game/GLOBALB.BUN')
-    .then((res) => (res.ok && typeof res.arrayBuffer === 'function' ? res.arrayBuffer() : Promise.reject(new Error('no local copy'))))
-    .then((buf) => {
-      $scope.$evalAsync(() => { if (!game) applyGameData(new Uint8Array(buf), 'GLOBALB.BUN (local copy)'); });
-    })
-    .catch(() => { $scope.$evalAsync(() => { $scope.tuning.dyno.localMissing = true; }); /* no local copy: the user picks the file */ });
+  // The Tuner's picker keeps the game file in this browser (IndexedDB, browser-store.ts), so the next visit needs no pick.
+  // Nothing of the game is stored in this repository or sent anywhere.
+  $scope.rememberGameFile = function (file: File | null): void {
+    if (!file) return;
+    file.arrayBuffer().then((buf) => {
+      const bytes = new Uint8Array(buf);
+      $scope.$evalAsync(() => {
+        applyGameData(bytes, file.name);
+        if (!game) return;
+        $scope.tuning.dyno.remembered = false;
+        rememberGame(bytes).then(() => $scope.$evalAsync(() => { $scope.tuning.dyno.remembered = true; }), () => { /* not kept: picked again next time */ });
+      });
+    }, () => $scope.$evalAsync(() => { $scope.tuning.dyno.gameError = 'Could not read the file.'; }));
+  };
+  $scope.forgetGameFile = function (): void {
+    forgetGame().then(() => $scope.$evalAsync(() => { $scope.tuning.dyno.remembered = false; $scope.tuning.dyno.forgotten = true; }), () => { /* nothing kept */ });
+  };
+  recallGame().then((bytes) => {
+    if (bytes) $scope.$evalAsync(() => { if (!game) { applyGameData(bytes, 'GLOBALB.BUN'); $scope.tuning.dyno.remembered = !!game; } });
+  });
 
   // ---- without a save ----------------------------------------------------------------------------
 
