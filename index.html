@@ -101,18 +101,21 @@
 
     <section class="profile-section" ng-if="tuner.now && !tuner.now.problem">
       <h3>Find the best setup</h3>
-      <div class="hand-mode tuner-source" role="radiogroup" aria-label="How you set the result" ng-if="tuner.source === 'save'">
+      <p class="tuner-fair"><strong>Fair play.</strong> Both choices stay inside the game's own limits, the same as its sliders allow. Neither is a cheat.</p>
+      <div class="hand-mode tuner-source" role="radiogroup" aria-label="Which setup you want" ng-if="tuner.source === 'save'">
         <label ng-class="{ on: tuner.how === 'save' }">
           <input type="radio" name="tunerhow" value="save" ng-model="tuner.how" ng-change="tunerHow()">
-          <span class="hand-mode-name">Write it into my save</span>
-          <span class="hand-mode-note">The exact best. You download a changed copy and load it in the game. No keys to press.</span>
+          <span class="hand-mode-name">Best setup (save only)</span>
+          <span class="hand-mode-note">Exact values. The game's keys move in steps and cannot always reach them, so a save holds them: download it and load it in the game.
+            <span ng-if="tuner.cards.length">Last search: {{ tuner.gap || 'the same as with keys on all 5 race types' }}{{ tuner.gap ? ' than with keys' : '' }}.</span></span>
         </label>
         <label ng-class="{ on: tuner.how === 'hand' }">
           <input type="radio" name="tunerhow" value="hand" ng-model="tuner.how" ng-change="tunerHow()">
-          <span class="hand-mode-name">Set it by hand in the game</span>
-          <span class="hand-mode-note">Your save stays as it is. We list the keys to press on each tuning screen. Keys cannot always reach the exact best.</span>
+          <span class="hand-mode-name">Setup you can make with keys</span>
+          <span class="hand-mode-note">We list the keys for each tuning screen. Or download a save with exactly what the keys give, and skip the keys.</span>
         </label>
       </div>
+      <p class="muted" ng-if="tuner.source !== 'save'">You get the keys to press in the game. To get a changed save, open the Tuner from a car slot of your save.</p>
       <div class="editor-row">
         <button type="button" class="profile-action-btn tuner-go" ng-click="tunerOptimize()" ng-disabled="tuner.busy">{{ tuner.busy ? 'Working…' : 'Find best setup' }}</button>
         <span class="muted" ng-if="!tuner.busy">Works out ECU, Turbo and Drivetrain for all 5 race types at once.</span>
@@ -124,7 +127,7 @@
     </section>
 
     <section class="profile-section" ng-if="tuner.cards.length">
-      <h3>{{ tuner.how === 'save' ? 'Your best setup' : 'Set it in the game' }}: {{ tuner.carName }}</h3>
+      <h3>{{ tuner.how === 'save' ? 'Best setup' : 'Setup with keys' }}: {{ tuner.carName }}</h3>
       <p class="message error" ng-if="tuner.stale">The save changed. Press “Find best setup” again.</p>
       <ol class="tuner-intro" ng-if="tuner.how === 'hand'">
         <li>In the game's Garage open “Performance Tuning / Dyno”, pick the race type of the tab below, then “Tune Settings”.</li>
@@ -151,17 +154,17 @@
         </div>
         <div class="tuner-scroll">
           <table class="tuner-compare">
-            <thead><tr><th>Dyno</th><th>{{ card.nowLabel }}</th><th ng-if="tuner.how === 'hand'">By hand</th><th>{{ tuner.how === 'hand' ? 'Save would give' : 'In the save' }}</th></tr></thead>
+            <thead><tr><th>Dyno</th><th>{{ card.nowLabel }}</th><th ng-if="tuner.how === 'hand'">With keys</th><th>Best (save only)</th></tr></thead>
             <tbody><tr ng-repeat="row in card.compare track by row.label"><th scope="row">{{ row.label }}</th><td>{{ row.now }}</td>
               <td ng-if="tuner.how === 'hand'" class="tuner-pick">{{ row.after }}</td>
               <td ng-class="{ 'tuner-pick': tuner.how === 'save', muted: tuner.how === 'hand' }">{{ card.table[$index].b }}</td></tr></tbody>
           </table>
         </div>
-        <p class="muted" ng-if="tuner.how === 'hand'">“By hand” = after the keys below. “Save would give” = the exact best, written straight into a save; the game's keys cannot always reach it.</p>
+        <p class="tuner-gap">Best setup against keys: <strong>{{ card.gap }}</strong>. Both are fair: inside the game's limits.</p>
         <p class="muted" ng-if="card.note">{{ card.note }}</p>
-        <div class="editor-row" ng-if="tuner.how === 'save' && tuner.canDownload">
-          <button type="button" class="profile-action-btn tuner-go" ng-click="tunerDownload()" ng-disabled="tuner.stale || tuner.busy">Download changed save</button>
-          <span class="muted">One copy with all 5 race types and your driving sliders. Load it in the game. Your loaded file is not changed. Keep your original backup.</span>
+        <div class="editor-row" ng-if="tuner.canDownload">
+          <button type="button" class="profile-action-btn tuner-go" ng-click="tunerDownload()" ng-disabled="tuner.stale || tuner.busy">{{ tuner.how === 'hand' ? 'Download save (same as the keys)' : 'Download save (best setup)' }}</button>
+          <span class="muted">One copy with all 5 race types and your driving sliders.<span ng-if="tuner.how === 'hand'"> It holds exactly what the keys below give.</span> Load it in the game. Your loaded file is not changed. Keep your original backup.</span>
         </div>
         <p class="muted" ng-if="tuner.how === 'save'">The game's screens, with your optional driving sliders:</p>
         <div class="tuner-screen" ng-repeat="scr in card.screens track by scr.name" ng-class="scr.state"
@@ -527,6 +530,7 @@
             </div>
             <details class="hand-older">
               <summary>Older auto-tune (editor rules of thumb, not the game's rules)</summary>
+              <p class="message"><strong>Not fair play:</strong> it sets values outside the game's limits, which the game's screens cannot do. The game cuts them back into its limits when it loads the save (tested in the game). For a fair setup use the Tuner.</p>
               <div class="dyno-controls">
                 <label class="dyno-gearing"><input type="checkbox" ng-model="tuning.dyno.optimizeGearing" ng-disabled="tuning.dyno.busy"> Optimize gearing &amp; shift spacing</label>
                 <button type="button" class="profile-action-btn" ng-click="optimizeDyno()" ng-disabled="tuning.dyno.busy">
@@ -614,6 +618,7 @@
               <input type="checkbox" ng-model="tuning.dyno.cheat" ng-disabled="tuning.dyno.busy">
               Cheat limits (save-only): set each point on its own
             </label>
+            <p class="message" ng-if="tuning.dyno.chart && tuning.dyno.cheat"><strong>Not fair play:</strong> outside the game's limits. The game cuts values back into its limits when it loads the save (tested in the game). For a fair setup use the Tuner.</p>
             <section class="dyno-scalars" ng-if="tuning.dyno.scalars.length">
               <div class="dyno-scalar" ng-repeat="row in tuning.dyno.scalars track by row.param">
                 <label for="scalar-{{ row.param }}">{{ row.label }}</label>

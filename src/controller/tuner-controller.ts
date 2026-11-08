@@ -5,7 +5,7 @@
  * the download is a changed copy. The save editor's own state stays in EditorController; this file reaches it only
  * through {@link TunerApi}.
  */
-import { DynoModel, findCar, readSlotDyno, setSetupTuning, type GameData } from '../model/dyno.js';
+import { DynoModel, findCar, readSlotDyno, type GameData } from '../model/dyno.js';
 import { getCarTypeHash, slotState } from '../model/slots.js';
 import { slotCount } from '../model/layout.js';
 import { TRAFFIC_CARS } from '../data/traffic-cars.js';
@@ -17,7 +17,7 @@ import { NitroScreen, rowInfo } from '../model/tune-keys.js';
 import { FEEL_SLIDERS, feelSliders, withFeel, type Feel } from '../model/feel.js';
 import { clearPrefs, loadPrefs, savePrefs } from './browser-store.js';
 import {
-  categoryScreens, GOAL_WORDS, goalChoices, groupTabs, legalOptions, lockedWhatIf, optimizeTab, planTab, PREFERENCES, SCREENS, screenPlans, SETUP_COUNT, startAfterC,
+  categoryScreens, gapWords, GOAL_WORDS, goalChoices, groupTabs, largestGap, legalOptions, lockedWhatIf, optimizeTab, planTab, PREFERENCES, saveWithTabs, SCREENS, screenPlans, SETUP_COUNT, startAfterC,
   TAB_NAMES, TAB_USES, TUNED, tunerSteps, type Preference, type TabResult,
 } from '../model/tuner.js';
 import { curveChart } from './editor-controller.js';
@@ -62,7 +62,7 @@ export function attachTuner($scope: EditorScope, api: TunerApi): () => void {
       })),
     ],
     now: null, busy: false, progress: '', done: 0, seconds: 0, error: '', stale: false, carName: '', fromC: true,
-    canDownload: false, cards: [], tabs: [], card: 0, feel: {}, sliders: [],
+    canDownload: false, gap: '', cards: [], tabs: [], card: 0, feel: {}, sliders: [],
   };
   const t = $scope.tuner;
   /** Optimize's result per tab (engine rows), the slider positions per tab, and the plans made from both. */
@@ -138,7 +138,7 @@ export function attachTuner($scope: EditorScope, api: TunerApi): () => void {
     results = [];
     base = [];
     if (dropFeel) feels = kept().feels;
-    t.cards = []; t.tabs = []; t.card = 0; t.stale = false; t.sliders = []; t.feel = {};
+    t.cards = []; t.tabs = []; t.card = 0; t.stale = false; t.sliders = []; t.feel = {}; t.gap = '';
   }
 
   /** The chosen car, or why there is none yet ('' = nothing chosen). */
@@ -256,6 +256,7 @@ export function attachTuner($scope: EditorScope, api: TunerApi): () => void {
   function show(keepCard: number): void {
     if (!src) return;
     t.cards = cards(src, results, goals);
+    t.gap = largestGap(results);
     // the game's five tabs in its order; tabs with the same plan open the same card
     t.tabs = TAB_NAMES.map((name, setup) => ({ name, short: TAB_USES[setup].short, card: t.cards.findIndex((c) => c.setups.includes(setup)) }));
     $scope.tunerTab(Math.min(keepCard, t.cards.length - 1));
@@ -389,13 +390,14 @@ export function attachTuner($scope: EditorScope, api: TunerApi): () => void {
     });
   };
 
-  /** Mode B: a copy of the save with the exact setup of all five tabs (sliders included); the loaded save stays as it is. */
+  /**
+   * A copy of the save with all five tabs (sliders included): the best (mode B) or the same bytes as the card's keys (mode A).
+   * The loaded save stays as it is.
+   */
   $scope.tunerDownload = function (): void {
     const save = api.save();
     if (!save || t.slot === null || t.source !== 'save' || t.stale || results.length !== SETUP_COUNT) return;
-    let next = save;
-    for (const r of results) next = setSetupTuning(next, t.slot, r.setup, r.optimum, true, true);
-    api.download(next);
+    api.download(saveWithTabs(save, t.slot, results, t.how === 'hand' ? 'keys' : 'best'));
   };
 
   /** Car record name of the chosen car (for its logo, ./game/logos/<name>.png), or '' when none. */
@@ -486,6 +488,7 @@ function cards(src: Source, results: TabResult[], goals: Preference[]): TunerCar
       screens: screenPlans(src.model, group.map((x) => x.setup), steps, whatIf, feelScreens).map((x) => ({ ...x, badge: BADGES[x.state], hasFeel: feelScreens.has(x.name) })),
       note: group.some((x) => x.setup === 1) ? 'In Drag races you shift by hand. The dyno shifts by itself.' : '',
       table,
+      gap: gapWords(diff),
       // only the by-hand list: the optimizer's own sheet has its own entry rules ("do not reset the Drivetrain"), which
       // differ from the steps above
       sheet: r.handSheet,

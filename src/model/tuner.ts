@@ -3,7 +3,7 @@
  * mode B) and the key planner (hand-input.ts, mode A); neither is changed here. The page runs {@link optimizeTab} in web
  * workers (src/tuner-worker.ts) because one tab takes about 20 s.
  */
-import { DynoModel, SETUP_COUNT, SETUP_NAMES, SETUP_SIZE, type GameData } from './dyno.js';
+import { DynoModel, SETUP_COUNT, SETUP_NAMES, SETUP_SIZE, setSetupTuning, type GameData } from './dyno.js';
 import { PERF_PARTS } from '../data/perf-parts.js';
 import { formatSheet, gameNumbers, OBJ_BY_SETUP, runLegal, type GameNumbers } from './legal-opt.js';
 import { formatHandPlan, planHandInput, ROW_ORDER, shownText, type HandInputPlan, type SliderPlan } from './hand-input.js';
@@ -172,6 +172,45 @@ export interface TabResult {
 export function planTab(model: DynoModel, setup: number, start: Uint8Array, optimum: Uint8Array, pref: Preference, legalSheet = ''): TabResult {
   const plan = planHandInput(model, start, optimum, setup, legalOptions(pref, setup).objective);
   return { setup, start, optimum, plan, legalSheet, handSheet: formatHandPlan(plan, setup) };
+}
+
+/** What a download writes: `best` = the exact optimum (mode B); `keys` = the bytes the card's keys give in the game (mode A). */
+export type SaveWhat = 'best' | 'keys';
+
+/**
+ * A copy of `save` with every tab's setup in `slot`: engine curves, gears, final drive and the driving rows (the sliders are
+ * in both, `optimum` and the keys' target, see feel.ts withFeel). `keys` writes `plan.setup`, the bytes the game holds after
+ * the card's presses (hand-input.ts planHandInput; the game agrees key by key, tuner repo docs/game-check-r3g.md A), so loading
+ * it is the same as typing the keys. The loaded save is not changed.
+ */
+export function saveWithTabs(save: Uint8Array, slot: number, results: TabResult[], what: SaveWhat): Uint8Array {
+  let next = save;
+  for (const r of results) next = setSetupTuning(next, slot, r.setup, what === 'keys' ? r.plan.setup : r.optimum, true, true);
+  return next;
+}
+
+/**
+ * The best (save only) against the keys, in numbers: `diff` is keys minus best (hand-input.ts planHandInput), so a plus time
+ * means the best is quicker. Below what the game's dyno screen shows (0.01 s, 0.1 km/h) counts as the same.
+ */
+export function gapWords(diff: HandInputPlan['diff']): string {
+  const out: string[] = [];
+  for (const [label, d] of [['0-60', diff.t60], ['0-100', diff.t100]] as const) {
+    if (d !== null && Math.abs(d) >= 0.005) out.push(`${label} ${Math.abs(d).toFixed(2)} s ${d > 0 ? 'quicker' : 'slower'}`);
+  }
+  if (Math.abs(diff.topKmh) >= 0.05) out.push(`top speed ${Math.abs(diff.topKmh).toFixed(1)} km/h ${diff.topKmh < 0 ? 'higher' : 'lower'}`);
+  return out.length ? out.join(', ') : 'the same';
+}
+
+/** Over all tabs: the largest time the best saves against the keys, as "0.03 s quicker (Drag, 0-100)", or '' when none. */
+export function largestGap(results: TabResult[]): string {
+  let best: { d: number; text: string } | null = null;
+  for (const r of results) {
+    for (const [label, d] of [['0-60', r.plan.diff.t60], ['0-100', r.plan.diff.t100]] as const) {
+      if (d !== null && d >= 0.005 && (!best || d > best.d)) best = { d, text: `${d.toFixed(2)} s quicker (${TAB_NAMES[r.setup]}, ${label})` };
+    }
+  }
+  return best?.text ?? '';
 }
 
 /** Tabs whose start, keys and result are the same share one card. */

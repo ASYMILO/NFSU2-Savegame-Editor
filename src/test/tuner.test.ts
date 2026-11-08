@@ -1,15 +1,16 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
-import { DynoModel, findCar, parseGameData, type CurveKind } from '../model/dyno.js';
+import { DynoModel, findCar, parseGameData, readSlotDyno, setSetupTuning, type CurveKind } from '../model/dyno.js';
 import { defaultSetup } from '../model/legal-opt.js';
 import type { SliderPlan } from '../model/hand-input.js';
 import { CurveScreen, NitroScreen, openRow, pressFinalDrive, pressRowState, resetRow, rowInfo } from '../model/tune-keys.js';
 import {
-  categoryScreens, curveKeys, goalChoices, groupTabs, legalOptions, menuOrder, planTab, RESET, SCREEN_ORDER, screenPlans, startAfterC, tunerSteps, unlockParts, type TabResult,
+  categoryScreens, curveKeys, gapWords, goalChoices, groupTabs, legalOptions, menuOrder, planTab, RESET, saveWithTabs, SCREEN_ORDER, screenPlans, startAfterC, tunerSteps, unlockParts, type TabResult,
 } from '../model/tuner.js';
 import { PERF_PARTS } from '../data/perf-parts.js';
-import { installedForLevels, withAero } from '../model/virtual-save.js';
+import { buildVirtualSave, installedForLevels, withAero } from '../model/virtual-save.js';
+import { withFeel } from '../model/feel.js';
 import { parsePrefs } from '../controller/browser-store.js';
 
 const GAME_BUN = process.env.NFSU2_GLOBALB ?? 'C:/Program Files (x86)/EA GAMES/Need for Speed Underground 2/GLOBAL/GLOBALB.BUN';
@@ -185,4 +186,39 @@ test('graph keys: RIGHT after every bar, RIGHT on bar 9 wraps to bar 1, stop aft
     'RIGHT', 'RIGHT', 'UP']);
   assert.equal(keys.filter((k) => k === 'LEFT').length, 0);
   assert.deepEqual(curveKeys([]), ['C']);
+});
+
+test('best against keys in numbers: plus = the best is quicker; below the dyno screen\'s digits = the same', () => {
+  assert.equal(gapWords({ t60: 0.02, t100: 0, topKmh: -1.2, powerBhp: 0 }), '0-60 0.02 s quicker, top speed 1.2 km/h higher');
+  assert.equal(gapWords({ t60: 0.004, t100: null, topKmh: 0.04, powerBhp: 3 }), 'the same');
+  assert.equal(gapWords({ t60: -0.01, t100: 0.03, topKmh: 0, powerBhp: 0 }), '0-60 0.01 s slower, 0-100 0.03 s quicker');
+});
+
+test('download "same as the keys": the save holds, on all 5 tabs of the 3000GT, the bytes the card\'s keys give', { skip: SKIP }, () => {
+  const game = parseGameData(new Uint8Array(readFileSync(GAME_BUN)));
+  const c = cases.find((x) => x.hash >>> 0 === 0x2d7c9b5d)!;
+  const car = findCar(game, 0x2d7c9b5d)!;
+  const installed = c.installed.map((b) => b !== 0);
+  const model = new DynoModel(game, car, installed, c.uniques);
+  let save = buildVirtualSave(0x2d7c9b5d, installed);
+  for (let k = 0; k < 5; k++) save = setSetupTuning(save, 0, k, Uint8Array.from(c.setup), true, true);
+  const starts = readSlotDyno(save, 0).setups;
+  // every tab another goal and driving sliders, so the rows of both kinds are in the keys
+  const results = starts.map((start, k) => {
+    const opt = withFeel(model, start, target(model, start), { steering: k % 2 ? -50 : 60, brakes: -40 + 20 * k, nitrous: 50 });
+    return planTab(model, k, start, opt, 'race');
+  });
+  const keys = readSlotDyno(saveWithTabs(save, 0, results, 'keys'), 0).setups;
+  const best = readSlotDyno(saveWithTabs(save, 0, results, 'best'), 0).setups;
+  let differs = 0;
+  results.forEach((r, k) => {
+    const typed = replay(model, starts[k], menuOrder(r.plan.plans));
+    assert.deepEqual(Array.from(keys[k]), Array.from(typed), `tab ${k}: save = keys`);
+    assert.deepEqual(Array.from(best[k]), Array.from(r.optimum), `tab ${k}: save = best`);
+    assert.ok(r.plan.plans.some((p) => p.row?.param === 8), `tab ${k}: steering keys`);
+    if (Array.from(typed).some((b, i) => b !== r.optimum[i])) differs++;
+  });
+  assert.ok(differs > 0, 'keys and best are the same on every tab: the test proves nothing');
+  // the loaded save is not changed
+  assert.deepEqual(Array.from(readSlotDyno(save, 0).setups[0]), c.setup);
 });

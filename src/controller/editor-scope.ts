@@ -249,6 +249,8 @@ export interface TunerCardView {
   }[];
   note: string;
   table: HandRow[];
+  /** The best (save only) against the keys on this card, in numbers ("0-60 0.02 s quicker, ..." or "the same"). */
+  gap: string;
   sheet: string;
 }
 
@@ -292,8 +294,10 @@ export interface TunerView {
   stale: boolean;
   carName: string;
   fromC: boolean;
-  /** A save was loaded for the result: mode B can be downloaded. */
+  /** A save was loaded for the result: both ways (best or same as the keys) can be downloaded. */
   canDownload: boolean;
+  /** After Optimize: how much the best (save only) beats the keys over all tabs, in numbers ('' before a result). */
+  gap: string;
   cards: TunerCardView[];
   /** The game's five tabs in its order and the card each one opens. */
   tabs: { name: string; short: string; card: number }[];
