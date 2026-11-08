@@ -400,6 +400,29 @@ a row moves it: rear sway bar +0.20 degrees, front sway bar -0.09; these rows ch
 - `npm test`: 152 tests, 152 pass, 0 skipped; `src/test/save.test.ts` unchanged.
 - Not checked: Safari, Firefox, phone size (owner: skip); the mph switch in a browser window (code and test only); the game's screen with the game set to miles.
 
+## 3i. Real driving, not only the dyno (2026-11-08, branch `feat/tuner-r3i`)
+Owner: "ale nam nie chodzi o "najlepiej wyglądające wyniki" tylko o faktyczną jazdę w grze więc to ważne." Evidence and method: tuner repo `docs/game-check-r3i.md`.
+
+### Is the Tuner's setup quicker when the car is driven? (game-check-r3i.md A)
+3000GT, free roam, collision body off, standing start, full throttle, straight line on road 1013 (the game's longest straight road; 1000 m
+does not exist: the line is straight for about 700 m, so 400 m and 600 m are used). Factory (key C on every row) against the Tuner's mode A
+for each tab (the card's keys, Optimize started from the factory setup), each in its own game, two passes (they repeat to <= 0.012 s).
+Free roam loads setup 0, so each setup's bytes were put in setup 0.
+
+| Setup | 0-60 mph | 0-100 mph | 0-200 km/h | 400 m | speed at 400 m | 600 m |
+|---|---|---|---|---|---|---|
+| factory | 3.77 s | 8.64 s | 12.98 s | 12.10 s | 192.5 km/h | 15.59 s |
+| Tuner Circuit / URL (same bytes) | 3.74 s | 8.45 s | 12.61 s | 12.01 s | 194.8 km/h | 15.47 s |
+| Tuner Drag | 3.61 s | 8.34 s | 12.53 s | 11.92 s | 194.6 km/h | 15.37 s |
+| Tuner Drift | 3.60 s | 8.23 s | 12.38 s | 11.90 s | 195.8 km/h | 15.34 s |
+| Tuner Street X | 3.63 s | 8.36 s | 12.55 s | 11.92 s | 194.5 km/h | 15.38 s |
+
+**Yes: every Tuner setup is quicker than factory in every column** (400 m: 0.09-0.20 s; speed at 400 m: +2.0 to +3.3 km/h; 0-200 km/h: 0.36-0.60 s).
+The gain on the road is smaller than the dyno's (0-100 mph: dyno -0.46 / -0.69 / -0.63 / -0.67 s, drive -0.19 / -0.30 / -0.41 / -0.28 s for
+Circuit / Drag / Drift / Street X) but has the same direction everywhere, and the road puts the dyno's three best (Drag, Drift, Street X) ahead of Circuit, as the dyno does
+(the three are within 0.02 s of each other over 400 m; for Drag the dyno's pick is 0.016 s behind the Drift setup). So the optimizer goal needed no change and nothing in the code changed for this.
+Not checked: a real Drag race (manual shifting, preset, launch), another car, the car's top speed (the straight ends at about 700 m).
+
 ## 7. Undo
 
 Round 3h only: `git checkout feat/tuner-r3g && npm run build`. Round 3g only: `git checkout feat/tuner-r3f && npm run build`. Round 3e only: `git checkout feat/tuner-r3c && npm run build` in `port-editor` (branch `feat/tuner-r3e` stays for later).
