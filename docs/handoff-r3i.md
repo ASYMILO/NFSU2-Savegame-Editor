@@ -15,7 +15,7 @@ Repos (both on `feat/tuner-r3i`, from `feat/tuner-r3h`):
 ## Open for the owner
 - Do they want the three speeds mapped to race tabs (needs a measure of typical speed per race; none exists)?
 - A real Drag race (manual shifting, launch) was not driven; free roam is automatic gearbox, setup 0.
-- Push of `feat/tuner-r3i` in both repos: not done unless noted in the report.
+- Pushed: `feat/tuner-r3i` to `fork` (editor) and `origin` (tuner repo). No PR, nothing to dev/main.
 
 ## Tools (tuner repo `tools/native/r3i/`)
 `gen_driveA.mjs` (factory + A_k profiles), `body_straight.py` + `straight_sweep.sh` + `straight_metrics.py` + `straight_table.py` (standing-start runs),
