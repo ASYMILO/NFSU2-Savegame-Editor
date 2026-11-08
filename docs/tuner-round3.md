@@ -404,14 +404,15 @@ a row moves it: rear sway bar +0.20 degrees, front sway bar -0.09; these rows ch
 Owner: "ale nam nie chodzi o "najlepiej wyglądające wyniki" tylko o faktyczną jazdę w grze więc to ważne." Evidence and method: tuner repo `docs/game-check-r3i.md`.
 
 ### Is the Tuner's setup quicker when the car is driven? (game-check-r3i.md A)
-3000GT, free roam, collision body off, standing start, full throttle, straight line on road 1013 (the game's longest straight road; 1000 m
-does not exist: the line is straight for about 700 m, so 400 m and 600 m are used). Factory (key C on every row) against the Tuner's mode A
-for each tab (the card's keys, Optimize started from the factory setup), each in its own game, two passes (they repeat to <= 0.012 s).
+3000GT, free roam, collision ON, standing start, full throttle, straight line on road 1013 (the game's longest straight road; 1000 m
+does not exist: the line is straight for about 700 m, so 400 m and 600 m are used). Each run stops by position at about 610 m, before the road end: 10 of 10 runs valid, no reset
+(a first version with the collision body off ran on to the road end and every run ended in a game reset after the readings: dropped, tuner repo `docs/game-check-r3i.md` section 0). Factory (key C on every row) against the Tuner's mode A
+for each tab (the card's keys, Optimize started from the factory setup), each in its own game, two passes (they repeat to <= 0.013 s).
 Free roam loads setup 0, so each setup's bytes were put in setup 0.
 
 | Setup | 0-60 mph | 0-100 mph | 0-200 km/h | 400 m | speed at 400 m | 600 m |
 |---|---|---|---|---|---|---|
-| factory | 3.77 s | 8.64 s | 12.98 s | 12.10 s | 192.5 km/h | 15.59 s |
+| factory | 3.77 s | 8.63 s | 12.97 s | 12.10 s | 192.5 km/h | 15.59 s |
 | Tuner Circuit / URL (same bytes) | 3.74 s | 8.45 s | 12.61 s | 12.01 s | 194.8 km/h | 15.47 s |
 | Tuner Drag | 3.61 s | 8.34 s | 12.53 s | 11.92 s | 194.6 km/h | 15.37 s |
 | Tuner Drift | 3.60 s | 8.23 s | 12.38 s | 11.90 s | 195.8 km/h | 15.34 s |
