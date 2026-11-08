@@ -362,8 +362,46 @@ header (curl 2026-11-07). Another site cannot read either, so the user picks the
 - A game set to miles: the gear rows in mph (`FUN_005b09a0` prints km/h or mph); the Tuner shows km/h only.
 - Body roll, steady cornering at the grip limit, setups 1-4 and a second car for the driving rows.
 
+## 3h. Fair play, game screens, mph, game checks at speed (2026-11-08, branch `feat/tuner-r3h`)
+
+Commits: `7927d46` (fair-play wording, best vs keys in numbers, Download also "same as the keys", the author's cheat limits and older
+auto-tune say they are outside the game's limits), `c394883` (each game screen its own framed block, empty screens one line),
+`1d9d29b` (this stage). Evidence: tuner repo `docs/game-check-r3h.md`.
+
+### Top speed in km/h or mph (`1d9d29b`)
+A "Top speed in km/h / mph (as your game is set)" choice under "Your car now"; every top speed on the page (now, cards, compare,
+by-hand table, gap words, "with the part" lines) uses it; kept in this browser (`prefs.units`, "Forget my choices" resets it).
+mph = m/s x 2.237f in float32, "%3.1f" (`FUN_0054a970`, `data/ghidra_decomp.c` l.239990-240003; the factor is 3.6f for km/h, 2.237f
+for mph, picked by `FUN_005ea8b0`). Check against the game's own record: 89.8525 m/s x 2.237 = 201.0 mph = `topMph` 201 (setup 0 of
+the check below); the game's dyno screen was not run with the game set to miles. Power is shown in bhp, as the game's screen does (433.8 bhp
+on `native/runs/r3h_saveA_s0/nfsu2_g000968_results.png`), no longer kW. `legal-opt.test.ts` expected objects now ignore `topMph` like `powerKw`.
+
+### Save written "same as the keys" = game dyno (game-check-r3h.md A)
+One save from `saveWithTabs(..., 'keys')` (what Download gives) for the 3000GT with every tab's driving sliders moved. For each tab the game
+opened the Dyno Chart without a key press, the 41 setup bytes in memory equalled the keys' bytes, and the Dyno Run gave exactly the editor's
+mode A numbers: 4.22/10.35/323.5/433.8 (Circuit), 4.10/10.14/318.6/433.8 (Drag), 4.22/10.22/318.6/432.0 (Drift), 4.10/10.12/309.0/435.1 (Street X),
+4.20/10.33/323.5/434.2 (URL): 5 of 5 equal.
+
+### Does speed matter? (game-check-r3h.md B, C)
+- Code: downforce is linear in speed, drag is quadratic (`FUN_0059e620` l.303897-303960); the Dyno (0-60, 0-100, top speed) uses no grip or downforce, so
+  no Dyno number and no Optimize result changes.
+- Game, collision body off, 60 runs: grip of the baseline car 2.545 g at 97 km/h, 2.937 g at 145, 3.212 g at 195 (full stick).
+  Steering and Braking sliders lose strength with speed (brake bias at 200 km/h: -3.1 % / +11.9 % stop distance against -10 % / +20 % at 100;
+  steering at stick 0.4: -3.0 % / +0.9 % at 200 against -9 % / +12 % at 100). Lowering front downforce or front grip makes the car lose speed
+  in a 200 km/h turn (152 / 157 km/h mean in the test); rear downforce lowest: -3 to -4 % at all speeds. All the other rows are <= 2 % at full stick.
+- On the 3000GT the saved downforce and grip are at the top of the slider boxes, so a slider could only take grip away.
+- The Tuner is **unchanged** by this (no new slider, no new text). Open for the owner: whether the Steering/Braking text should say that the effect is smaller at 200 km/h.
+
+### Body roll (game-check-r3h.md D)
+Measured from the car's side axis in memory (`*(*0x8900b4+4)+0xA0`, a unit vector): 1.6 degrees at full stick at 100, 150 and 200 km/h. The most
+a row moves it: rear sway bar +0.20 degrees, front sway bar -0.09; these rows change side g by <= 1.3 %. No body-roll slider.
+
+### Checks (3h)
+- `npm test`: 152 tests, 152 pass, 0 skipped; `src/test/save.test.ts` unchanged.
+- Not checked: Safari, Firefox, phone size (owner: skip); the mph switch in a browser window (code and test only); the game's screen with the game set to miles.
+
 ## 7. Undo
 
-Round 3g only: `git checkout feat/tuner-r3f && npm run build`. Round 3e only: `git checkout feat/tuner-r3c && npm run build` in `port-editor` (branch `feat/tuner-r3e` stays for later).
+Round 3h only: `git checkout feat/tuner-r3g && npm run build`. Round 3g only: `git checkout feat/tuner-r3f && npm run build`. Round 3e only: `git checkout feat/tuner-r3c && npm run build` in `port-editor` (branch `feat/tuner-r3e` stays for later).
 Round 3d only: `git checkout 4582180 && npm run build`. Round 3c only: `git checkout feat/tuner-r3 && npm run build` in `port-editor`. All of round 3: `git checkout feat/hand-input && npm run build` in `port-editor` (the author's screen and round 2 come back as before), or delete the
 branch: `git branch -D feat/tuner-r3` and `git push fork --delete feat/tuner-r3`.
