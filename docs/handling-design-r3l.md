@@ -45,7 +45,7 @@ We did not measure lap time, so "5 % = x seconds" is not known. We can only say 
 **Owner's question: do the small rows matter?** Answer: **shocks and ride heights, no. The rest, yes.**
 | Part | Biggest change we saw | Where | Verdict |
 |---|---|---|---|
-| Front shocks, rear shocks | 1 % and 1.3 % | any turn | Too small to feel. You are not wrong that they change *something*, but about a hundredth of a degree to a tenth. |
+| Front shocks, rear shocks | 1 % and 1.3 % | any turn | Too small to feel. You are not wrong that they change *something*, but about a tenth of a degree at most. |
 | Front ride height, rear ride height | 3 % and 3.4 % | any turn | Under 5 % in every test. About 0.3 degrees. Not worth a slider. |
 | Steering ratio | 8.8 % rear slip, 13 % swing growth | fast left-right turns | Over 5 %. Already a slider. |
 | Front springs | 12 % | steady turn at 100 km/h | Over 5 %. Same direction as the sway bars, smaller. |
