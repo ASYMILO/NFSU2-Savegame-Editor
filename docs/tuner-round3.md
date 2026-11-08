@@ -423,8 +423,21 @@ Circuit / Drag / Drift / Street X) but has the same direction everywhere, and th
 (the three are within 0.02 s of each other over 400 m; for Drag the dyno's pick is 0.016 s behind the Drift setup). So the optimizer goal needed no change and nothing in the code changed for this.
 Not checked: a real Drag race (manual shifting, preset, launch), another car, the car's top speed (the straight ends at about 700 m).
 
+### Steering and Braking text at the speeds that matter (game-check-r3i.md C)
+Owner on "weaker at 200 km/h": "to chyba oczywiste i wynika z fizyki - jak w prawdziwym świecie?" So no separate warning: the card text (`feel.ts`
+`FEEL_SLIDERS[].when`, built from `STEERING_TURN_PCT` and `BRAKE_STOP_M`) gives the measured effect at 100, 150 and 200 km/h (3000GT, collision off, 3 passes):
+- Steering, the same small turn of the wheel, how much the car turns (left end / right end): at 100 km/h 7 % less / 19 % more, at 150 km/h 2 % less / 22 % more,
+  at 200 km/h 3 % less / 1 % more; a full turn of the wheel: no change.
+- Braking, full brake, the car stops in (left end / as set / right end): from 100 km/h 21 / 23 / 28 m, from 150 km/h 46 / 48 / 57 m, from 200 km/h 80 / 83 / 93 m; it stopped straight (within 1.6 degrees) every time.
+These replace the r3g numbers (-9 % / +12 % at 100, +23 % at 150), which came from another method (collision on). The test `feel.test.ts` ties the card numbers to the raw readings.
+Speeds are **not** mapped to race tabs: no measurement of typical speed per tab exists, a map would be a guess; every card shows all three speeds.
+
+### Checks (3i)
+- `NFSU2_GLOBALB=... npm test`: 153 tests, 153 pass, 0 skipped; `src/test/save.test.ts` unchanged (70 tests).
+- Not checked: a real Drag race, another car, speeds per tab, the cards in a browser window (text only changed).
+
 ## 7. Undo
 
-Round 3h only: `git checkout feat/tuner-r3g && npm run build`. Round 3g only: `git checkout feat/tuner-r3f && npm run build`. Round 3e only: `git checkout feat/tuner-r3c && npm run build` in `port-editor` (branch `feat/tuner-r3e` stays for later).
+Round 3i only: `git checkout feat/tuner-r3h && npm run build`. Round 3h only: `git checkout feat/tuner-r3g && npm run build`. Round 3g only: `git checkout feat/tuner-r3f && npm run build`. Round 3e only: `git checkout feat/tuner-r3c && npm run build` in `port-editor` (branch `feat/tuner-r3e` stays for later).
 Round 3d only: `git checkout 4582180 && npm run build`. Round 3c only: `git checkout feat/tuner-r3 && npm run build` in `port-editor`. All of round 3: `git checkout feat/hand-input && npm run build` in `port-editor` (the author's screen and round 2 come back as before), or delete the
 branch: `git branch -D feat/tuner-r3` and `git push fork --delete feat/tuner-r3`.

@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
 import { DynoModel, parseGameData } from '../model/dyno.js';
-import { FEEL_SLIDERS, feelSliders, withFeel } from '../model/feel.js';
+import { BRAKE_STOP_M, DRIVE_SPEEDS, FEEL_SLIDERS, STEERING_TURN_PCT, feelSliders, withFeel } from '../model/feel.js';
 import { lockedWhatIf, planTab, startAfterC } from '../model/tuner.js';
 import { installedForLevels, levelsOf, withAero } from '../model/virtual-save.js';
 
@@ -64,4 +64,17 @@ test('feel sliders: only rows measured in the game (round 3g), and a side opens 
   const atTop = feelSliders(model, top, [0]).find((s) => s.key === 'steering')!;
   assert.deepEqual([atTop.min, atTop.max], [-100, 0]);
   assert.match(atTop.limit, /Only to the left/);
+});
+
+test('driving sliders: the card words are the game measurements at 100, 150 and 200 km/h (round 3i), nothing else', () => {
+  // raw readings, tuner repo docs/game-check-r3i.md C: stick 0.4 side g [lowest byte, baseline, highest byte]; full-brake stop m [lowest, baseline, highest]
+  const side = [[0.702, 0.7525, 0.893], [0.687, 0.698, 0.852], [0.543, 0.561, 0.566]];
+  const stop = [[20.81, 23.04, 27.75], [45.67, 48.18, 56.7], [80.16, 82.73, 92.6]];
+  assert.deepEqual(DRIVE_SPEEDS, [100, 150, 200]);
+  assert.deepEqual(side.map(([lo, b, hi]) => [Math.round((lo / b - 1) * 100), Math.round((hi / b - 1) * 100)]), STEERING_TURN_PCT);
+  assert.deepEqual(stop.map((r) => r.map(Math.round)), BRAKE_STOP_M);
+  const steering = FEEL_SLIDERS.find((s) => s.key === 'steering')!.when, braking = FEEL_SLIDERS.find((s) => s.key === 'brakes')!.when;
+  assert.match(steering, /at 100 km\/h 7 % less \/ 19 % more, at 150 km\/h 2 % less \/ 22 % more, at 200 km\/h 3 % less \/ 1 % more/);
+  assert.match(braking, /from 100 km\/h 21 \/ 23 \/ 28 m, from 150 km\/h 46 \/ 48 \/ 57 m, from 200 km\/h 80 \/ 83 \/ 93 m/);
+  for (const w of [steering, braking]) assert.ok(!/weaker|jargon|ratio|bias/i.test(w), w);
 });

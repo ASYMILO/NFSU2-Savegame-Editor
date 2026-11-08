@@ -31,26 +31,41 @@ export interface FeelView extends FeelSlider {
 }
 
 /**
+ * What the two driving sliders do at the speeds a player drives, measured in the game (tuner repo docs/game-check-r3i.md C: 3000GT,
+ * free roam, collision body off, flat road, setup 0 with only the one row moved to the lowest / highest byte of its box; two passes,
+ * identical to 0.01 g / 0.15 m, except the 100 km/h baseline turn, 0.750 or 0.755 g from game to game: its mean is used). Rounded to whole numbers; the text of the cards is built from these and nothing else.
+ */
+export const DRIVE_SPEEDS = [100, 150, 200];
+/** Steering ratio, stick held at 0.4: change in the car's side g (how sharply it turns) at the left / right end, in %, per speed. */
+export const STEERING_TURN_PCT: [number, number][] = [[-7, 19], [-2, 22], [-3, 1]];
+/** Brake bias, full brake: stopping distance in m at the left end / as set / right end, per speed. */
+export const BRAKE_STOP_M: [number, number, number][] = [[21, 23, 28], [46, 48, 57], [80, 83, 93]];
+
+const pct = (n: number): string => (n < 0 ? `${-n} % less` : `${n} % more`);
+const steeringWords = (): string => DRIVE_SPEEDS.map((v, i) => `at ${v} km/h ${pct(STEERING_TURN_PCT[i][0])} / ${pct(STEERING_TURN_PCT[i][1])}`).join(', ');
+const brakingWords = (): string => DRIVE_SPEEDS.map((v, i) => `from ${v} km/h ${BRAKE_STOP_M[i].join(' / ')} m`).join(', ');
+
+/**
  * Only rows with a measured effect in the game get a slider, and the words say only what was measured (round 3g, tuner
- * repo docs/game-check-r3g.md D: 3000GT, setup 0, free roam on the airport road, every row at both ends of its box, each run
+ * repo docs/game-check-r3g.md D and round 3i, docs/game-check-r3i.md C: 3000GT, setup 0, free roam, every row at both ends of its box, each run
  * twice with the same input; numbers that differed between the two runs are not used). Rows dropped there moved stopping
  * distance and side grip by 4 % or less: springs, shocks, sway bars, ride height, tire grip, downforce.
  */
 export const FEEL_SLIDERS: FeelSlider[] = [
-  // byte 8 ("Steering Ratio" on the Suspension screen; physics R+0x270, setup-bytes.md). Measured: same stick 0.4, side g of
-  // the path 0.737 / 0.808 / 0.907 at 100 km/h (lowest / saved / highest byte) and 0.685 / 0.711 / 0.875 at 150 km/h; full
-  // stick: no change (the tires are the limit there); stopping distance unchanged. Slow corner: radius 37.1 -> 31.0 m (r3f C).
+  // byte 8 ("Steering Ratio" on the Suspension screen; physics R+0x270, setup-bytes.md). Measured (r3i C): same stick 0.4, side g of
+  // the path 0.702 / 0.750-0.755 / 0.892-0.894 at 100 km/h (the baseline game gives 0.750 or 0.755: mean used), 0.687 / 0.698 / 0.852 at 150 km/h, 0.543 / 0.561 / 0.566 at 200 km/h (lowest / saved /
+  // highest byte); full stick: no change (<= 0.4 % at the three speeds, r3h C); stopping distance unchanged.
   { key: 'steering', screen: 'Suspension', label: 'Steering', low: 'Slower', high: 'Quicker', params: [8],
-    basis: 'Moves Steering Ratio. Measured in the game (3000GT): with the same small steering input the car turns 4-9 % less '
-      + 'at the left end and 12-23 % more at the right end, at 100 and 150 km/h. At full steering it changes nothing.',
-    when: 'Right: the car turns more for the same steering. Left: less.' },
-  // brakes FUN_005a4d80: front = 2·pedal·(1−B), rear = 2·pedal·B, B = this row (setup-bytes.md l.120-121). Measured: full brake
-  // from 100 km/h 20.93 / 23.16 / 27.90 m, from 150 km/h 45.8-45.9 / 48.25 / 57.02 m (lowest / saved / highest byte); the car
-  // stayed straight within 1.6 deg every time; turning was not changed.
+    basis: 'Moves Steering Ratio. The numbers are measured in the game with a 3000GT (how sharply the car turns, wheel held at 0.4 of full, '
+      + 'flat road, two runs gave the same). With the wheel turned fully it changes nothing at 100, 150 and 200 km/h.',
+    when: `Same small turn of the wheel, how much the car turns (left end / right end): ${steeringWords()}. A full turn of the wheel: no change.` },
+  // brakes FUN_005a4d80: front = 2·pedal·(1−B), rear = 2·pedal·B, B = this row (setup-bytes.md l.120-121). Measured (r3i C): full brake
+  // from 100 / 150 / 200 km/h 20.81 / 23.04 / 27.75 m, 45.67 / 48.18 / 56.70 m, 80.16 / 82.73 / 92.60 m (lowest / saved / highest byte);
+  // the car stopped within 1.6 degrees of straight every time; turning was not changed (r3h C).
   { key: 'brakes', screen: 'Tires & Brakes', label: 'Braking', low: 'Stops shorter', high: 'Stops longer', params: [18],
-    basis: 'Moves Brake Bias: to the right, more brake force goes to the rear wheels. Measured in the game (3000GT): stopping '
-      + 'from 100 km/h takes 21 m at the left end, 23 m as saved and 28 m at the right end; from 150 km/h 46, 48 and 57 m.',
-    when: 'Left for shorter stops. The car stayed straight at both ends in the test.' },
+    basis: 'Moves Brake Bias: to the right, more brake force goes to the rear wheels. The numbers are measured in the game with a 3000GT '
+      + '(full brake to a stop, flat road, two runs gave the same). The car stopped within 2 degrees of straight every time.',
+    when: `Full brake, the car stops in (left end / as set / right end): ${brakingWords()}. It stopped straight every time.` },
   // nitrous: one slider, longer = weaker (FUN_005b3100, l.58); seen in the game 2026-11-04 (setup-bytes.md "Confirmed in game":
   // a long and a very short setting were clearly visible in play)
   { key: 'nitrous', screen: 'Nitrous', label: 'Nitrous boost', low: 'Long, gentle', high: 'Short, strong', params: [16],
