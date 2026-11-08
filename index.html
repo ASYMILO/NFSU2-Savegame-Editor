@@ -170,8 +170,9 @@
         <div class="tuner-screen" ng-repeat="scr in card.screens track by scr.name" ng-class="scr.state"
              ng-if="tuner.how === 'hand' || scr.hasFeel">
           <p class="tuner-screen-head"><strong>{{ scr.name }}</strong>
-            <span class="tuner-badge" ng-if="tuner.how === 'hand'">{{ scr.badge }}</span>
-            <span class="muted" ng-if="scr.text && tuner.how === 'hand'">{{ scr.text }}</span></p>
+            <span class="tuner-badge" ng-if="tuner.how === 'hand' || scr.state === 'feel'">{{ scr.badge }}</span>
+            <span class="tuner-screen-text" ng-if="tuner.how === 'hand' && (scr.state === 'keep' || scr.state === 'ok')">{{ scr.text }}</span></p>
+          <p class="tuner-screen-text" ng-if="scr.text && scr.state !== 'keep' && scr.state !== 'ok' && (tuner.how === 'hand' || scr.state === 'feel')">{{ scr.text }}</p>
           <div class="tuner-step" ng-if="tuner.how === 'hand'" ng-repeat="step in scr.steps track by $index" ng-class="{ done: step.done }">
             <label class="tuner-check"><input type="checkbox" ng-model="step.done">
               <span><strong>{{ step.row }}</strong>: press {{ step.keys }}.<span ng-if="step.shows"> Then it shows <strong>{{ step.shows }}</strong><span class="muted" ng-if="step.from && step.from !== step.shows"> (now {{ step.from }})</span>.</span></span></label>

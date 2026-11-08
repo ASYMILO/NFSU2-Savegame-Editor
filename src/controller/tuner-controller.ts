@@ -426,7 +426,7 @@ function partHint(game: GameData, code: string): string {
   return `Opens ${screens.join(', ')}. ${tuned}${extra} A higher level gives a wider range.`;
 }
 
-const BADGES = { set: 'To do', ok: 'Already right', feel: 'Your choice', keep: 'Leave as is', locked: 'Needs a part' } as const;
+const BADGES = { set: 'To do', ok: 'Nothing to change', feel: 'Optional', keep: 'Nothing to change', locked: 'Needs a part' } as const;
 
 /** The chart's presses in words ("UP 3", "DOWN 1", "–") and its rows as rounds. Order as planHandInput: bar 1 to 9, round by round. */
 function pressWords(chart: CurveChart): CurveChart {

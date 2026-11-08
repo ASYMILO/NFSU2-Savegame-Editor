@@ -510,8 +510,17 @@ body {
 .tuner-uses th, .tuner-uses td, .tuner-compare th, .tuner-compare td { padding: 3px 14px 3px 0; text-align: left; border-bottom: 1px solid var(--color-border); }
 .tuner-uses thead th, .tuner-compare thead th { font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--color-text-muted); font-weight: 600; }
 .tuner-compare td strong { color: var(--color-text-strong); }
-.tuner-screen { padding: 8px 0 4px; border-top: 1px solid var(--color-border); }
-.tuner-screen-head { margin: 0 0 4px; display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: baseline; }
+/* round 3h: each game screen is its own block (frame, own background, header line); its sliders sit inside it */
+.tuner-screen { padding: 10px 12px; border: 1px solid var(--color-border); border-left: 4px solid var(--color-border); border-radius: 8px;
+  background: var(--color-elevated); color: var(--color-text); }
+.tuner-screen.set { border-left-color: var(--color-primary); }
+.tuner-screen.feel { border-left-color: var(--color-green); }
+.tuner-screen.locked { border-left-color: var(--color-warning); }
+.tuner-screen.keep, .tuner-screen.ok { padding: 6px 12px; background: transparent; }
+.tuner-screen.keep .tuner-screen-head, .tuner-screen.ok .tuner-screen-head { margin: 0; }
+.tuner-screen-text { margin: 0 0 4px; font-size: 13px; color: var(--color-text-muted); }
+.tuner-screen + .tuner-screen { margin-top: 0; }
+.tuner-screen-head { margin: 0 0 6px; font-size: 15px; display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: baseline; }
 .tuner-badge { font-size: 11px; padding: 1px 8px; border-radius: 10px; border: 1px solid var(--color-border); color: var(--color-text-muted); }
 .tuner-screen.set .tuner-badge { border-color: var(--color-primary); color: var(--color-text-strong); }
 .tuner-screen.locked .tuner-badge { border-color: var(--color-warning); color: var(--color-warning); }
@@ -522,7 +531,7 @@ body {
 .tuner-done::before { content: "✓ "; color: var(--color-primary); font-weight: 700; }
 .tuner-prefs-box { margin-top: 14px; }
 .tuner-prefs-box > p { font-size: 13px; color: var(--color-text); }
-.tuner-feel { display: grid; gap: 2px; padding: 8px 0; border-top: 1px solid var(--color-border); font-size: 13px; color: var(--color-text); }
+.tuner-feel { display: grid; gap: 2px; margin-top: 6px; padding: 8px 10px; border-radius: 6px; background: var(--color-bg); font-size: 13px; color: var(--color-text); }
 .tuner-feel-row { display: flex; align-items: center; gap: 10px; margin-top: 4px; }
 .tuner-feel-row span { flex: 0 1 140px; min-width: 0; color: var(--color-text-muted); }
 .tuner-feel-row span:last-child { text-align: left; }

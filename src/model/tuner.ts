@@ -353,8 +353,8 @@ export function screenPlans(model: DynoModel, setups: number[], steps: TunerStep
     if (tuned) return { name, state: 'ok', text: 'The Tuner checked it: already right for this race.', steps: [] };
     // drift and Street X presets zero nitrous duration (docs/setup-bytes.md l.103, FUN_005b4dc0)
     if (name === 'Nitrous' && setups.every((k) => k === 2 || k === 3)) return { name, state: 'keep', text: 'This race turns nitrous off.', steps: [] };
-    if (feel.has(name)) return { name, state: 'feel', text: 'Optional. Leave it, or move a slider if the car feels wrong.', steps: [] };
-    return { name, state: 'keep', text: 'Leave it as it is.', steps: [] };
+    if (feel.has(name)) return { name, state: 'feel', text: 'The Tuner leaves it as it is. Move the slider here only if you want the car to drive differently.', steps: [] };
+    return { name, state: 'keep', text: 'The Tuner does not change it, and it has no slider here.', steps: [] };
   });
 }
 
