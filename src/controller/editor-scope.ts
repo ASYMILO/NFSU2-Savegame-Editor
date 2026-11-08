@@ -296,6 +296,8 @@ export interface TunerView {
   fromC: boolean;
   /** A save was loaded for the result: both ways (best or same as the keys) can be downloaded. */
   canDownload: boolean;
+  /** Top speed in km/h or mph, as the game is set. */
+  units: 'kmh' | 'mph';
   /** After Optimize: how much the best (save only) beats the keys over all tabs, in numbers ('' before a result). */
   gap: string;
   cards: TunerCardView[];
@@ -441,6 +443,8 @@ export interface EditorScope extends angular.IScope {
   tunerForgetPrefs(): void;
   /** The save / by-hand choice changed (kept in this browser). */
   tunerHow(): void;
+  /** km/h or mph changed (kept in this browser). */
+  tunerUnits(): void;
   tunerFeel(): void;
   tunerTab(card: number): void;
   tunerDownload(): void;

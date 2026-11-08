@@ -41,6 +41,8 @@ export interface TunerPrefs {
   goals: string[];
   /** Driving slider positions per game tab, -100..100 per slider key. */
   feels: Record<string, number>[];
+  /** Top speed in km/h or mph, as the game is set. */
+  units: 'kmh' | 'mph';
 }
 
 /** Reads stored choices; anything malformed is dropped (the text comes from the browser, it may be old or edited). */
@@ -53,6 +55,7 @@ export function parsePrefs(text: string | null, goalKeys: readonly string[], fee
   const feels = Array.isArray(o.feels) ? o.feels : [];
   return {
     how: o.how === 'hand' ? 'hand' : 'save',
+    units: o.units === 'mph' ? 'mph' : 'kmh',
     goals: Array.from({ length: 5 }, (_, k) => (typeof goals[k] === 'string' && goalKeys.includes(goals[k] as string) ? goals[k] as string : 'race')),
     feels: Array.from({ length: 5 }, (_, k) => {
       const f = feels[k] && typeof feels[k] === 'object' ? feels[k] as Record<string, unknown> : {};

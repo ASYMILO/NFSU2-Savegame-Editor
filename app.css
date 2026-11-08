@@ -570,6 +570,8 @@ body {
 .tuner-slot-row { margin-bottom: 6px; }
 .tuner-file, .tuner-kept { margin: 10px 0 0; font-size: 13px; }
 .tuner-uses-line { margin: 0 0 6px; }
+.tuner-units { display: flex; flex-wrap: wrap; gap: 4px 12px; align-items: center; margin: 8px 0 0; font-size: 13px; color: var(--color-text); }
+.tuner-units input { accent-color: var(--color-primary); }
 .tuner-why summary { font-size: 12px; color: var(--color-text-muted); cursor: pointer; }
 .tuner-screen.feel { font-size: 13px; }
 .tuner-screen.feel .tuner-badge { border-color: var(--color-green); color: var(--color-text-strong); }

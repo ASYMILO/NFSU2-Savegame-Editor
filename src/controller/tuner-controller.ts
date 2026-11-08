@@ -39,11 +39,15 @@ const WORKERS = Math.max(1, Math.min(SETUP_COUNT, (navigator.hardwareConcurrency
 const LEVEL_WORDS = ['None', 'Street', 'Pro', 'Extreme'];
 
 const sec = (v: number | null): string => (v === null ? '–' : `${v.toFixed(2)} s`);
-const kmh = (v: number): string => `${v.toFixed(1)} km/h`;
-// the game's dyno screen shows 0-60 / 0-100 without a unit, top speed in km/h and power in kW (tuner repo
+/** Top speed in the unit the game is set to (the game's screen: km/h or mph, FUN_0054a970; set on the Tuner page). */
+let speedUnit: 'kmh' | 'mph' = 'kmh';
+const top = (g: GameNumbers): string => (speedUnit === 'mph' ? `${g.topMph.toFixed(1)} mph` : `${g.topKmh.toFixed(1)} km/h`);
+// the game's dyno screen shows 0-60 / 0-100 without a unit and top speed in km/h or mph (tuner repo
 // native/runs/dyno_check_20261106/results_A_all.png, docs/dyno-check-3000gt.md), so the Tuner shows the same; the 0-60 and
 // 0-100 are mph (the dyno stops its clocks at 60 and 100 mph, FUN_005b06a0, dyno.ts dragSim `60 <= v * mph`), so the labels say so
-const kw = (v: number): string => `${v.toFixed(1)} kW`;
+// power: the game's screen shows bhp, also when set to km/h (tuner repo native/runs/r3h_saveA_s0/nfsu2_g000968_results.png:
+// 433.8 bhp; docs/emu-notes.md "power is shown in bhp")
+const bhp = (v: number): string => `${v.toFixed(1)} bhp`;
 
 /** @returns `sync`, which the editor calls after the save or the game data changed. */
 export function attachTuner($scope: EditorScope, api: TunerApi): () => void {
@@ -62,20 +66,21 @@ export function attachTuner($scope: EditorScope, api: TunerApi): () => void {
       })),
     ],
     now: null, busy: false, progress: '', done: 0, seconds: 0, error: '', stale: false, carName: '', fromC: true,
-    canDownload: false, gap: '', cards: [], tabs: [], card: 0, feel: {}, sliders: [],
+    canDownload: false, gap: '', units: 'kmh', cards: [], tabs: [], card: 0, feel: {}, sliders: [],
   };
   const t = $scope.tuner;
   /** Optimize's result per tab (engine rows), the slider positions per tab, and the plans made from both. */
   let base: Uint8Array[] = [];
   // the choices kept in this browser (browser-store.ts): goal and slider positions per tab, and A or B
   const goalKeys = PREFERENCES.map((p) => p.key), feelKeys = FEEL_SLIDERS.map((f) => f.key);
-  const kept = (): { how: 'save' | 'hand'; goals: Preference[]; feels: Feel[] } => {
+  const kept = (): { how: 'save' | 'hand'; goals: Preference[]; feels: Feel[]; units: 'kmh' | 'mph' } => {
     const p = loadPrefs(goalKeys, feelKeys);
-    return { how: p?.how ?? 'save', goals: (p?.goals ?? new Array(SETUP_COUNT).fill('race')) as Preference[], feels: p?.feels ?? [] };
+    return { how: p?.how ?? 'save', goals: (p?.goals ?? new Array(SETUP_COUNT).fill('race')) as Preference[], feels: p?.feels ?? [], units: p?.units ?? 'kmh' };
   };
   let goals = kept().goals;
   let feels: Feel[] = kept().feels;
-  const keep = (): void => savePrefs({ how: t.source === 'save' ? t.how : kept().how, goals, feels: Array.from({ length: SETUP_COUNT }, (_, k) => feels[k] ?? {}) });
+  const keep = (): void => savePrefs({ how: t.source === 'save' ? t.how : kept().how, goals, feels: Array.from({ length: SETUP_COUNT }, (_, k) => feels[k] ?? {}), units: t.units });
+  t.units = speedUnit = kept().units;
   let results: TabResult[] = [];
   let src: Source | null = null;
   let runToken = 0;
@@ -175,7 +180,7 @@ export function attachTuner($scope: EditorScope, api: TunerApi): () => void {
     const columns = c.saved ? TAB_NAMES : ['Factory setting'];
     const dyno = setups.map((s, k) => {
       const g = gameNumbers(model.evaluate(s));
-      return { tab: columns[k], t60: sec(g.t60), t100: sec(g.t100), top: kmh(g.topKmh), power: kw(g.powerKw) };
+      return { tab: columns[k], t60: sec(g.t60), t100: sec(g.t100), top: top(g), power: bhp(g.powerBhp) };
     });
     const settings: TunerNowView['settings'] = [];
     for (const name of SCREENS.map((s) => s.name)) {
@@ -302,10 +307,20 @@ export function attachTuner($scope: EditorScope, api: TunerApi): () => void {
     goals = new Array(SETUP_COUNT).fill('race');
     feels = [];
     if (t.source === 'save') t.how = 'save';
+    t.units = speedUnit = 'kmh';
+    refreshNow();
     if (t.cards.length && !t.busy) $scope.tunerOptimize(true);
   };
 
   $scope.tunerHow = function (): void { if (t.source === 'save') keep(); };
+
+  /** km/h or mph, as the game is set: every top speed on the page in that unit (kept in this browser). */
+  $scope.tunerUnits = function (): void {
+    speedUnit = t.units;
+    keep();
+    refreshNow();
+    if (results.length && !t.busy) show(t.card);
+  };
 
   $scope.tunerOptimize = function (keepView = false): void {
     const s = source();
@@ -445,7 +460,7 @@ function whatIfLines(src: Source): Record<string, string> {
     if (SCREENS.find((s) => s.name === screen)!.params.some((p) => src.model.tuningRecords.has(p))) continue;
     const w = lockedWhatIf(src.model, src.installed, src.uniques, screen);
     if (!w) continue;
-    const g = (n: GameNumbers): string => `0–60 ${sec(n.t60)}, top ${kmh(n.topKmh)}`;
+    const g = (n: GameNumbers): string => `0–60 ${sec(n.t60)}, top ${top(n)}`;
     out[screen] = `With ${w.part}, before any tuning: ${g(w.withPart)} (now, factory setting: ${g(w.now)}).`;
   }
   return out;
@@ -462,12 +477,13 @@ function cards(src: Source, results: TabResult[], goals: Preference[]): TunerCar
     const steps = tunerSteps(src.model, r, src.fromC).map((s) => (s.curve && s.passes?.length
       ? { ...s, chart: pressWords(curveChart(src.model.curve(r.plan.setup, s.curve)!, 0, s.passes)) } : s));
     // "gap" = by hand minus the save, so a minus time or a plus speed means "by hand is better"
-    const dkw = a.powerKw - b.powerKw;
+    const dbhp = a.powerBhp - b.powerBhp, dtop = speedUnit === 'mph' ? a.topMph - b.topMph : a.topKmh - b.topKmh;
+    const unit = speedUnit === 'mph' ? 'mph' : 'km/h';
     const table: HandRow[] = [
       { label: '0-60 mph', a: sec(a.t60), b: sec(b.t60), diff: sign(diff.t60, 's', 2), zero: diff.t60 === null || Math.abs(diff.t60) < 0.005 },
       { label: '0-100 mph', a: sec(a.t100), b: sec(b.t100), diff: sign(diff.t100, 's', 2), zero: diff.t100 === null || Math.abs(diff.t100) < 0.005 },
-      { label: 'Top speed', a: kmh(a.topKmh), b: kmh(b.topKmh), diff: sign(diff.topKmh, 'km/h', 1), zero: Math.abs(diff.topKmh) < 0.05 },
-      { label: 'Power', a: kw(a.powerKw), b: kw(b.powerKw), diff: sign(Number(dkw.toFixed(1)), 'kW', 1), zero: Math.abs(dkw) < 0.05 },
+      { label: 'Top speed', a: top(a), b: top(b), diff: sign(Number(dtop.toFixed(1)), unit, 1), zero: Math.abs(dtop) < 0.05 },
+      { label: 'Power', a: bhp(a.powerBhp), b: bhp(b.powerBhp), diff: sign(Number(dbhp.toFixed(1)), 'bhp', 1), zero: Math.abs(dbhp) < 0.05 },
     ];
     for (const row of table) if (row.zero) row.diff = 'same';
     return {
@@ -478,8 +494,8 @@ function cards(src: Source, results: TabResult[], goals: Preference[]): TunerCar
       compare: [
         { label: '0-60 mph', now: sec(now.t60), after: sec(a.t60) },
         { label: '0-100 mph', now: sec(now.t100), after: sec(a.t100) },
-        { label: 'Top speed', now: kmh(now.topKmh), after: kmh(a.topKmh) },
-        { label: 'Power', now: kw(now.powerKw), after: kw(a.powerKw) },
+        { label: 'Top speed', now: top(now), after: top(a) },
+        { label: 'Power', now: bhp(now.powerBhp), after: bhp(a.powerBhp) },
       ],
       goal: GOAL_WORDS[legalOptions(goals[r.setup], r.setup).objective] ?? '',
       goals: goalChoices(r.setup),
@@ -488,7 +504,7 @@ function cards(src: Source, results: TabResult[], goals: Preference[]): TunerCar
       screens: screenPlans(src.model, group.map((x) => x.setup), steps, whatIf, feelScreens).map((x) => ({ ...x, badge: BADGES[x.state], hasFeel: feelScreens.has(x.name) })),
       note: group.some((x) => x.setup === 1) ? 'In Drag races you shift by hand. The dyno shifts by itself.' : '',
       table,
-      gap: gapWords(diff),
+      gap: gapWords({ ...diff, topKmh: Number(dtop.toFixed(1)) }, unit),
       // only the by-hand list: the optimizer's own sheet has its own entry rules ("do not reset the Drivetrain"), which
       // differ from the steps above
       sheet: r.handSheet,

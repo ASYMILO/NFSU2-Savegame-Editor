@@ -193,12 +193,12 @@ export function saveWithTabs(save: Uint8Array, slot: number, results: TabResult[
  * The best (save only) against the keys, in numbers: `diff` is keys minus best (hand-input.ts planHandInput), so a plus time
  * means the best is quicker. Below what the game's dyno screen shows (0.01 s, 0.1 km/h) counts as the same.
  */
-export function gapWords(diff: HandInputPlan['diff']): string {
+export function gapWords(diff: HandInputPlan['diff'], unit = 'km/h'): string {
   const out: string[] = [];
   for (const [label, d] of [['0-60', diff.t60], ['0-100', diff.t100]] as const) {
     if (d !== null && Math.abs(d) >= 0.005) out.push(`${label} ${Math.abs(d).toFixed(2)} s ${d > 0 ? 'quicker' : 'slower'}`);
   }
-  if (Math.abs(diff.topKmh) >= 0.05) out.push(`top speed ${Math.abs(diff.topKmh).toFixed(1)} km/h ${diff.topKmh < 0 ? 'higher' : 'lower'}`);
+  if (Math.abs(diff.topKmh) >= 0.05) out.push(`top speed ${Math.abs(diff.topKmh).toFixed(1)} ${unit} ${diff.topKmh < 0 ? 'higher' : 'lower'}`);
   return out.length ? out.join(', ') : 'the same';
 }
 

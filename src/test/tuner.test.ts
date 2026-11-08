@@ -35,8 +35,10 @@ test('each tab offers its own goal first and no goal twice (Street X = accelerat
 test('stored Tuner choices: malformed parts are dropped, slider positions clamped, no other keys kept', () => {
   assert.equal(parsePrefs('not json', ['race'], ['stiff']), null);
   const p = parsePrefs(JSON.stringify({ how: 'hand', goals: ['top', 'bogus'], feels: [{ stiff: 250, other: 5 }, null], save: [1, 2] }), ['race', 'top'], ['stiff'])!;
-  assert.deepEqual(p, { how: 'hand', goals: ['top', 'race', 'race', 'race', 'race'], feels: [{ stiff: 100 }, {}, {}, {}, {}] });
+  assert.deepEqual(p, { how: 'hand', units: 'kmh', goals: ['top', 'race', 'race', 'race', 'race'], feels: [{ stiff: 100 }, {}, {}, {}, {}] });
   assert.equal(parsePrefs('{"how":"x"}', ['race'], [])!.how, 'save');
+  assert.equal(parsePrefs('{"units":"mph"}', ['race'], [])!.units, 'mph');
+  assert.equal(parsePrefs('{"units":"furlongs"}', ['race'], [])!.units, 'kmh');
 });
 
 test('tabs with the same start, keys and result share a card', () => {

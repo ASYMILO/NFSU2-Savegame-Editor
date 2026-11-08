@@ -95,6 +95,10 @@
           <tbody><tr ng-repeat="row in tuner.now.dyno track by row.tab"><th scope="row">{{ row.tab }}</th><td>{{ row.t60 }}</td><td>{{ row.t100 }}</td><td>{{ row.top }}</td><td>{{ row.power }}</td></tr></tbody>
         </table>
       </div>
+      <div class="tuner-units" role="radiogroup" aria-label="Top speed unit">Top speed in
+        <label><input type="radio" name="tunerunits" value="kmh" ng-model="tuner.units" ng-change="tunerUnits()"> km/h</label>
+        <label><input type="radio" name="tunerunits" value="mph" ng-model="tuner.units" ng-change="tunerUnits()"> mph</label>
+        <span class="muted">(as your game is set)</span></div>
       <p class="muted">As the game's Dyno Results screen shows them. Its 0-60 and 0-100 are in mph, also when the game is set to km/h.<span ng-if="tuner.source === 'list'"> No save: this is the factory setting, what the C key (back to default) gives in the game.</span></p>
       <p class="message" ng-if="tuner.now.problem">{{ tuner.now.problem }}</p>
     </section>
@@ -222,7 +226,7 @@
           <pre class="dyno-sheet">{{ card.sheet }}</pre>
         </details>
       </article>
-      <p class="muted tuner-kept">This browser keeps your choices (save or by hand, goals, sliders), not your save.
+      <p class="muted tuner-kept">This browser keeps your choices (save or by hand, goals, sliders, km/h or mph), not your save.
         <button type="button" class="link-btn" ng-click="tunerForgetPrefs()" ng-disabled="tuner.busy">Forget my choices</button></p>
       <p class="muted" ng-if="tuner.how === 'hand' && !tuner.canDownload">With your save you could also download a changed copy: go back to the save editor, load your save and press “Best setup (Tuner)…” on your car.</p>
     </section>

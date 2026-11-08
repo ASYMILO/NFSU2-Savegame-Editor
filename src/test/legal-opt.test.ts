@@ -62,9 +62,9 @@ test('legal optimizer reproduces the recorded result, stays legal and its entry 
     const res = runLegal(model, car, c.setup, 0, { launchMin: 0.9 });
     assert.deepEqual(res.plain.setupBytes, ref.plain, `${ref.car}: plain bytes`);
     assert.deepEqual(res.launch!.setupBytes, ref.launch, `${ref.car}: launch-protected bytes`);
-    // the recorded reference predates powerKw (the game's kW, shown by the Tuner)
-    assert.deepEqual({ ...res.plain.dyno, powerKw: undefined }, { ...(ref.plainDyno as object), powerKw: undefined }, `${ref.car}: plain dyno numbers`);
-    assert.deepEqual({ ...res.launch!.dyno, powerKw: undefined }, { ...(ref.launchDyno as object), powerKw: undefined }, `${ref.car}: launch dyno numbers`);
+    // the recorded reference predates powerKw and topMph (shown by the Tuner)
+    assert.deepEqual({ ...res.plain.dyno, powerKw: undefined, topMph: undefined }, { ...(ref.plainDyno as object), powerKw: undefined, topMph: undefined }, `${ref.car}: plain dyno numbers`);
+    assert.deepEqual({ ...res.launch!.dyno, powerKw: undefined, topMph: undefined }, { ...(ref.launchDyno as object), powerKw: undefined, topMph: undefined }, `${ref.car}: launch dyno numbers`);
     checkLegal(model, res.plain);
     checkLegal(model, res.launch!);
     checkEntryOrder(model, res.plain);

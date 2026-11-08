@@ -475,6 +475,11 @@ export interface GameNumbers {
   t60: number | null;
   t100: number | null;
   topKmh: number;
+  /**
+   * Top speed as the game's screen shows it with the game set to miles: m/s x 2.237f in float32, "%3.1f" (FUN_0054a970,
+   * tuner repo data/ghidra_decomp.c l.239990-240003: the factor is 3.6f in km/h, 2.237f in mph, picked by FUN_005ea8b0).
+   */
+  topMph: number;
   torqueNm: number;
   torqueRpm: number;
   powerBhp: number;
@@ -491,6 +496,7 @@ export function gameNumbers(r: ReturnType<DynoModel['evaluate']>): GameNumbers {
     t60:      trunc2(r.t60),
     t100:     trunc2(r.t100),
     topKmh:   r1(r.topSpeed / MPH_PER_MS * 3.6),
+    topMph:   r1(Math.fround(Math.fround(r.topSpeed / MPH_PER_MS) * Math.fround(MPH_PER_MS))),
     torqueNm: Number((Math.fround(Math.fround(r.peakTorque / 1000) * 1000) + 1e-9).toFixed(1)),
     torqueRpm: r.peakTorqueRpm,
     powerBhp: Number((Math.fround(r.peakPower * Math.fround(1.34102209)) + 1e-9).toFixed(1)),
