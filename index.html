@@ -179,7 +179,7 @@
               <span class="tuner-feel-row"><span>{{ h.low }}</span>
                 <input type="range" ng-attr-min="{{ h.min }}" ng-attr-max="{{ h.max }}" step="25" ng-model="tuner.feel[h.key]" ng-model-options="{ updateOn: 'change' }" ng-change="tunerFeel(h.key)" ng-disabled="tuner.busy" aria-label="{{ h.label }}: {{ h.low }} to {{ h.high }}">
                 <span>{{ h.high }}</span></span></label>
-            <small>Moves: {{ h.rows }}. Now at {{ tuner.feel[h.key] || 0 }} % of the way to the ends of this car's own ranges.</small>
+            <small>Moves (↑ higher number, ↓ lower number): {{ h.rows }}. Now at {{ tuner.feel[h.key] || 0 }} % of the way to the ends of this car's own ranges.</small>
             <ul class="tuner-evidence">
               <li ng-repeat="f in h.findings track by $index"><strong>{{ f.kind }}:</strong> <span ng-class="{ muted: f.text === 'nie zmierzone' }">{{ f.text }}</span><span class="muted" ng-if="f.source"> [{{ f.source }}]</span></li>
             </ul>

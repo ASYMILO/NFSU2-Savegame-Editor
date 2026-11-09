@@ -155,12 +155,13 @@ export const FINDINGS: Record<'stable' | 'push', Finding[]> = {
 /** One sentence above the sliders: what Optimize did with the four rows on this drivetrain and tab, and why. */
 export function handlingNote(drive: Drivetrain, tab: number): string {
   if (drive === 'fwd' && DOSE_TABS.includes(tab)) {
-    return `Front-wheel drive: Optimize moved the four rows ${Math.round(ANTI_PUSH_DOSE * 100)} % of the way toward the "front bites" ends, `
-      + 'the direction that was faster in the lap tests on both front-wheel-drive cars (the Civic Si only at 100 %). The slider shows where it stands.';
+    return `Front-wheel drive: Optimize moved the four rows ${Math.round(ANTI_PUSH_DOSE * 100)} % of the way toward the "front bites" ends. `
+      + 'At equal speed that was faster in 3 of 4 car-and-track tests and equal in the 4th (two front-wheel-drive cars, two tracks); '
+      + 'the Civic Si got worse at its limit at 100 %, and 50 % was only driven on the Peugeot. The slider shows where it stands.';
   }
   if (drive === 'fwd') return `Front-wheel drive: on this race type Optimize leaves the four rows as they are. Nobody drove this race type with them moved (${NOT_MEASURED}).`;
-  return 'Optimize leaves the four rows as they are. In the lap tests the "rear holds" ends won on one track and lost on the other for all three rear-drive and all-wheel-drive cars, '
-    + 'so there is no default. Move the slider if the rear steps out.';
+  return 'Optimize leaves the four rows as they are. For all three rear-drive and all-wheel-drive test cars the "rear holds" ends were a little faster on the Freemont track '
+    + 'and slower on the short circuit, so there is no default. Move the slider if the rear steps out.';
 }
 
 /** The words for something nobody measured. Never a guess. */
