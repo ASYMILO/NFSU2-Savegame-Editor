@@ -5,6 +5,7 @@ import type { PerfPart, UniquePerfPart } from '../data/perf-parts.js';
 import type { CurveKind, DynoEvent, ScalarCategory, ScalarRow } from '../model/dyno.js';
 import type { ColorPalette } from '../model/visual.js';
 import type { CareerReport } from '../model/career.js';
+import type { AdvancedRow, HandlingSlider } from '../model/handling.js';
 
 /** Result of a donor-list or file-load problem, shown in the status line. */
 export interface Status {
@@ -248,6 +249,8 @@ export interface TunerCardView {
     steps: { screen: string; row: string; keys: string; shows: string; from?: string; presses: number; chart?: CurveChart; done?: boolean }[];
   }[];
   note: string;
+  /** Every row of the car's tuning screens with its value, range and who changed it (folded under the card). */
+  advanced: AdvancedRow[];
   table: HandRow[];
   /** The best (save only) against the keys on this card, in numbers ("0-60 0.02 s quicker, ..." or "the same"). */
   gap: string;
@@ -258,6 +261,8 @@ export interface TunerCardView {
 export interface TunerNowView {
   carName: string;
   parts: { label: string; level: string }[];
+  /** Drivetrain from the game data: "Rear-wheel drive (rear share 1.00)". */
+  drive: string;
   missing: string[];
   /** One row per tab (save), or one row "Factory setting" (no save). */
   dyno: { tab: string; t60: string; t100: string; top: string; power: string }[];
@@ -308,6 +313,10 @@ export interface TunerView {
   /** Slider positions of the card on show (-100..100, 0 = as now), and the sliders it can use. */
   feel: Record<string, number>;
   sliders: TunerFeelView[];
+  /** The two handling sliders of the card on show (positions are in `feel` under their keys), empty when the parts open none of their rows. */
+  handling: HandlingSlider[];
+  /** What Optimize did with the handling rows for this car and tab. */
+  handlingNote: string;
 }
 
 /** Top-level tuning tab. */
@@ -445,7 +454,8 @@ export interface EditorScope extends angular.IScope {
   tunerHow(): void;
   /** km/h or mph changed (kept in this browser). */
   tunerUnits(): void;
-  tunerFeel(): void;
+  /** @param changed the key of the slider that moved (the two handling sliders switch each other off). */
+  tunerFeel(changed?: string): void;
   tunerTab(card: number): void;
   tunerDownload(): void;
   tunerLogo(): string;

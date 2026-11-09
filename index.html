@@ -86,6 +86,7 @@
       <div class="tuner-logo" ng-if="tunerLogo()">
         <img ng-src="./game/logos/{{ tunerLogo() }}.png" alt="{{ tunerLogo() }}" onload="this.parentNode.hidden=false" onerror="this.parentNode.hidden=true">
       </div>
+      <p class="tuner-drive"><strong>Drive:</strong> {{ tuner.now.drive }}</p>
       <p><strong>Parts:</strong> <span ng-repeat="p in tuner.now.parts track by p.label">{{ p.label }}: {{ p.level }}{{ $last ? '.' : ' · ' }}</span>
         <span ng-if="!tuner.now.parts.length">none.</span></p>
       <p class="muted" ng-if="tuner.now.missing.length">Not installed: {{ tuner.now.missing.join(', ') }}.</p>
@@ -170,6 +171,32 @@
           <button type="button" class="profile-action-btn tuner-go" ng-click="tunerDownload()" ng-disabled="tuner.stale || tuner.busy">{{ tuner.how === 'hand' ? 'Download save (same as the keys)' : 'Download save (best setup)' }}</button>
           <span class="muted">One copy with all 5 race types and your driving sliders.<span ng-if="tuner.how === 'hand'"> It holds exactly what the keys below give.</span> Load it in the game. Your loaded file is not changed. Keep your original backup.</span>
         </div>
+        <div class="tuner-handling" ng-if="tuner.handling.length">
+          <h4>How the car drives in corners</h4>
+          <p class="muted">{{ tuner.handlingNote }}</p>
+          <div class="tuner-feel" ng-repeat="h in tuner.handling track by h.key">
+            <label><strong>{{ h.label }}</strong>
+              <span class="tuner-feel-row"><span>{{ h.low }}</span>
+                <input type="range" ng-attr-min="{{ h.min }}" ng-attr-max="{{ h.max }}" step="25" ng-model="tuner.feel[h.key]" ng-model-options="{ updateOn: 'change' }" ng-change="tunerFeel(h.key)" ng-disabled="tuner.busy" aria-label="{{ h.label }}: {{ h.low }} to {{ h.high }}">
+                <span>{{ h.high }}</span></span></label>
+            <small>Moves: {{ h.rows }}. Now at {{ tuner.feel[h.key] || 0 }} % of the way to the ends of this car's own ranges.</small>
+            <ul class="tuner-evidence">
+              <li ng-repeat="f in h.findings track by $index"><strong>{{ f.kind }}:</strong> <span ng-class="{ muted: f.text === 'nie zmierzone' }">{{ f.text }}</span><span class="muted" ng-if="f.source"> [{{ f.source }}]</span></li>
+            </ul>
+            <details class="tuner-why"><summary>What it changes</summary><small class="muted">{{ h.basis }}</small></details>
+          </div>
+          <p class="muted"><small>Both sliders use the same four rows in opposite directions, so only one can be on. Test cars only; nobody measured every car.</small></p>
+        </div>
+        <details class="hand-older tuner-advanced">
+          <summary>Advanced: every row ({{ card.advanced.length }}) with its value, range and what changed it</summary>
+          <div class="tuner-scroll">
+            <table class="tuner-compare">
+              <thead><tr><th>Screen</th><th>Row</th><th>{{ card.nowLabel }}</th><th>Result</th><th>Range of this car</th><th>Changed by</th></tr></thead>
+              <tbody><tr ng-repeat="a in card.advanced track by $index" ng-class="{ 'tuner-changed': a.changed }">
+                <td>{{ a.screen }}</td><td>{{ a.row }}</td><td>{{ a.now }}</td><td>{{ a.after }}</td><td>{{ a.range }}</td><td>{{ a.by || '–' }}</td></tr></tbody>
+            </table>
+          </div>
+        </details>
         <p class="muted" ng-if="tuner.how === 'save'">The game's screens, with your optional driving sliders:</p>
         <div class="tuner-screen" ng-repeat="scr in card.screens track by scr.name" ng-class="scr.state"
              ng-if="tuner.how === 'hand' || scr.hasFeel">

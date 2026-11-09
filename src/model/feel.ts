@@ -122,7 +122,7 @@ export function feelSliders(model: DynoModel, start: ArrayLike<number>, setups: 
 }
 
 /** `pos` (-1..1) of the way from `now` to `lo` (negative) or `hi` (positive). */
-const toward = (now: number, lo: number, hi: number, pos: number): number => (pos >= 0 ? now + pos * (hi - now) : now + pos * (now - lo));
+export const toward = (now: number, lo: number, hi: number, pos: number): number => (pos >= 0 ? now + pos * (hi - now) : now + pos * (now - lo));
 
 /**
  * The setup `base` with the feel rows set from `start` (the rows as they are now) by the slider positions.

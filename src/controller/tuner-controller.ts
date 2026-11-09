@@ -15,6 +15,7 @@ import { gameNumbers, type GameNumbers } from '../model/legal-opt.js';
 import { ROW_LABELS, ROW_ORDER, shownText } from '../model/hand-input.js';
 import { NitroScreen, rowInfo } from '../model/tune-keys.js';
 import { FEEL_SLIDERS, feelSliders, withFeel, type Feel } from '../model/feel.js';
+import { advancedRows, DRIVE_WORDS, driveShare, drivetrainOf, handlingNote, handlingOf, handlingSliders, HANDLING_KEYS, withHandling } from '../model/handling.js';
 import { clearPrefs, loadPrefs, savePrefs } from './browser-store.js';
 import {
   categoryScreens, gapWords, GOAL_WORDS, goalChoices, groupTabs, largestGap, legalOptions, lockedWhatIf, optimizeTab, planTab, PREFERENCES, saveWithTabs, SCREENS, screenPlans, SETUP_COUNT, startAfterC,
@@ -66,7 +67,7 @@ export function attachTuner($scope: EditorScope, api: TunerApi): () => void {
       })),
     ],
     now: null, busy: false, progress: '', done: 0, seconds: 0, error: '', stale: false, carName: '', fromC: true,
-    canDownload: false, gap: '', units: 'kmh', cards: [], tabs: [], card: 0, feel: {}, sliders: [],
+    canDownload: false, gap: '', units: 'kmh', cards: [], tabs: [], card: 0, feel: {}, sliders: [], handling: [], handlingNote: '',
   };
   const t = $scope.tuner;
   /** Optimize's result per tab (engine rows), the slider positions per tab, and the plans made from both. */
@@ -143,7 +144,7 @@ export function attachTuner($scope: EditorScope, api: TunerApi): () => void {
     results = [];
     base = [];
     if (dropFeel) feels = kept().feels;
-    t.cards = []; t.tabs = []; t.card = 0; t.stale = false; t.sliders = []; t.feel = {}; t.gap = '';
+    t.cards = []; t.tabs = []; t.card = 0; t.stale = false; t.sliders = []; t.handling = []; t.handlingNote = ''; t.feel = {}; t.gap = '';
   }
 
   /** The chosen car, or why there is none yet ('' = nothing chosen). */
@@ -192,8 +193,9 @@ export function attachTuner($scope: EditorScope, api: TunerApi): () => void {
       }
     }
     const tunable = model.ecuTunable || model.turboTunable || model.gearingParameters.length > 0;
+    const share = driveShare(model);
     t.now = {
-      carName: c.carName, parts, missing: t.levels.filter((l) => !levels[l.code]).map((l) => l.label), dyno, columns, settings,
+      carName: c.carName, parts, drive: `${DRIVE_WORDS[drivetrainOf(share)]} (rear share ${share.toFixed(2)}, read from the game data)`, missing: t.levels.filter((l) => !levels[l.code]).map((l) => l.label), dyno, columns, settings,
       problem: tunable ? '' : c.saved ? 'This car has no ECU, Turbo or Transmission part yet. Buy one in the game first: only those can be tuned for speed.'
         : 'Pick the parts your car has (below). At least an ECU, Turbo or Transmission part is needed: only those can be tuned for speed.',
     };
@@ -254,13 +256,12 @@ export function attachTuner($scope: EditorScope, api: TunerApi): () => void {
 
   /** Plan of one tab from Optimize's result and the tab's sliders (they change only rows Optimize leaves alone). */
   function plan(s: Source, setup: number, sheet: string): TabResult {
-    const target = withFeel(s.model, s.starts[setup], base[setup], feels[setup] ?? {});
-    return planTab(s.model, setup, s.starts[setup], target, goals[setup], sheet);
+    return planTab(s.model, setup, s.starts[setup], layersOf(s.model, s.starts[setup], base[setup], feels[setup] ?? {}, setup).final, goals[setup], sheet);
   }
 
   function show(keepCard: number): void {
     if (!src) return;
-    t.cards = cards(src, results, goals);
+    t.cards = cards(src, results, goals, base, feels);
     t.gap = largestGap(results);
     // the game's five tabs in its order; tabs with the same plan open the same card
     t.tabs = TAB_NAMES.map((name, setup) => ({ name, short: TAB_USES[setup].short, card: t.cards.findIndex((c) => c.setups.includes(setup)) }));
@@ -276,12 +277,21 @@ export function attachTuner($scope: EditorScope, api: TunerApi): () => void {
     t.feel = feels[first];
     t.sliders = feelSliders(src.model, src.starts[first], view.setups)
       .map(({ key, screen, label, low, high, basis, when, min, max, limit }) => ({ key, screen, label, low, high, basis, when, min, max, limit }));
+    // handling: the positions Optimize used for this car and tab (the default on a front-wheel-drive car), then the sliders
+    const drive = drivetrainOf(driveShare(src.model)), h = handlingOf(t.feel, drive, first);
+    t.feel[HANDLING_KEYS.stable] = h.stable;
+    t.feel[HANDLING_KEYS.push] = h.push;
+    t.handling = handlingSliders(src.model, base[first], drive, first);
+    t.handlingNote = t.handling.length ? handlingNote(drive, first) : '';
     // a range input with no value sits in the middle of its box; 0 (= as now) is the left or right end on a one-sided slider
     for (const sl of t.sliders) t.feel[sl.key] = t.feel[sl.key] ?? 0;
   };
 
-  $scope.tunerFeel = function (): void {
+  $scope.tunerFeel = function (changed?: string): void {
     if (!src || !results.length || t.busy) return;
+    // the two handling sliders use the same rows in opposite directions: the one that moved switches the other off
+    if (changed === HANDLING_KEYS.stable && t.feel[changed] > 0) t.feel[HANDLING_KEYS.push] = 0;
+    if (changed === HANDLING_KEYS.push && t.feel[changed] > 0) t.feel[HANDLING_KEYS.stable] = 0;
     const view = t.cards[t.card];
     if (!view) return;
     for (const setup of view.setups) {
@@ -342,7 +352,7 @@ export function attachTuner($scope: EditorScope, api: TunerApi): () => void {
       if ('error' in out) { t.error = `${TAB_NAMES[setup]}: ${out.error}`; t.busy = false; stopClock(); runToken++; return; }
       cache.set(keyOf(setup), out);
       nextBase[setup] = Uint8Array.from(out.bytes);
-      fresh[setup] = planTab(s.model, setup, s.starts[setup], withFeel(s.model, s.starts[setup], nextBase[setup], feels[setup] ?? {}), pref[setup], out.sheet);
+      fresh[setup] = planTab(s.model, setup, s.starts[setup], layersOf(s.model, s.starts[setup], nextBase[setup], feels[setup] ?? {}, setup).final, pref[setup], out.sheet);
       done++;
       t.done = done;
       if (done === SETUP_COUNT) {
@@ -466,7 +476,16 @@ function whatIfLines(src: Source): Record<string, string> {
   return out;
 }
 
-function cards(src: Source, results: TabResult[], goals: Preference[]): TunerCardView[] {
+/**
+ * The setup after the driving sliders (`felt`) and the result (`final`): `baseBytes` is Optimize's result, then the handling rows
+ * are moved by the handling control (handling.ts: the default dose on a front-wheel-drive car, or the sliders' positions).
+ */
+function layersOf(model: DynoModel, start: Uint8Array, baseBytes: Uint8Array, feel: Feel, setup: number): { felt: Uint8Array; final: Uint8Array } {
+  const felt = withFeel(model, start, baseBytes, feel);
+  return { felt, final: withHandling(model, felt, handlingOf(feel, drivetrainOf(driveShare(model)), setup)) };
+}
+
+function cards(src: Source, results: TabResult[], goals: Preference[], base: Uint8Array[], feels: Feel[]): TunerCardView[] {
   const sign = (v: number | null, unit: string, digits: number): string => (v === null ? '–' : `${v > 0 ? '+' : ''}${v.toFixed(digits)} ${unit}`);
   const whatIf = whatIfLines(src);
   return groupTabs(results).map((group): TunerCardView => {
@@ -503,6 +522,7 @@ function cards(src: Source, results: TabResult[], goals: Preference[]): TunerCar
       presses: steps.reduce((n, s) => n + s.presses, 0),
       screens: screenPlans(src.model, group.map((x) => x.setup), steps, whatIf, feelScreens).map((x) => ({ ...x, badge: BADGES[x.state], hasFeel: feelScreens.has(x.name) })),
       note: group.some((x) => x.setup === 1) ? 'In Drag races you shift by hand. The dyno shifts by itself.' : '',
+      advanced: advancedRows(src.model, r.start, { base: base[r.setup], ...layersOf(src.model, r.start, base[r.setup], feels[r.setup] ?? {}, r.setup) }),
       table,
       gap: gapWords({ ...diff, topKmh: Number(dtop.toFixed(1)) }, unit),
       // only the by-hand list: the optimizer's own sheet has its own entry rules ("do not reset the Drivetrain"), which
