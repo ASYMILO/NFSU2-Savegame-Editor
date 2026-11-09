@@ -113,3 +113,17 @@ test('cached curves equal a fresh model, also after other setups were built', { 
     assert.deepEqual(neighbours(used, a), neighbours(open(game, c).model, a), `${kind}: moves cached = fresh`);
   }
 });
+
+test('circuit objective: rolling 50-120 mph time is finite and the optimum is not slower than reset-to-default', { skip: SKIP }, () => {
+  const game = parseGameData(new Uint8Array(readFileSync(GAME_BUN)));
+  for (const ref of refs) {
+    const c = exact.cases[ref.caseIndex];
+    const { model } = open(game, c);
+    const t0 = model.rollTime(c.setup, 50, 120);
+    assert.ok(Number.isFinite(t0) && t0 > 0, `${ref.car}: rolling time ${t0}`);
+    assert.ok(model.rollTime(c.setup, 50, 80) < t0, `${ref.car}: a shorter band takes less time`);
+    // the search starts from reset-to-default (a saved start may hold a curve the sliders cannot reach)
+    const tDef = model.rollTime(defaultSetup(Uint8Array.from(c.setup)), 50, 120);
+    assert.ok(model.rollTime(Uint8Array.from(ref.plain), 50, 120) <= tDef + 1e-9, `${ref.car}: optimum not slower over the lap band`);
+  }
+});

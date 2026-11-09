@@ -34,7 +34,7 @@ export function goalChoices(setup: number): { key: Preference; label: string; te
  * our choice, not taken from the game; the game has no score for a setup. Power has a tiny weight there (only to break ties).
  */
 export const GOAL_WORDS: Record<string, string> = {
-  circuit: 'short 0-60 and 0-100 times, plus some top speed',
+  circuit: 'fast pull from 50 to 120 mph (lap speeds), plus some top speed',
   drag: 'the shortest quarter mile',
   drift: 'quick 0-60 and strong pull in the middle revs',
   streetx: 'quick 0-60 and 0-100',

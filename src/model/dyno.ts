@@ -875,7 +875,20 @@ export class DynoModel {
    */
   evaluate(setup: ArrayLike<number>): DynoResult {
     const p = this.tuned(setup);
-    return { ...dragSim(p, this.car.index), topSpeed: topSpeed(p) * MPH, ...peaks(p) };
+    const { at: _at, ...run } = dragSim(p, this.car.index);
+    return { ...run, topSpeed: topSpeed(p) * MPH, ...peaks(p) };
+  }
+
+  /**
+   * Rolling acceleration: seconds from `fromMph` to `toMph` in the dyno run (full throttle, the game's shift points).
+   * `toMph` is cut to 90 % of the top speed so slow cars still get a finite time.
+   */
+  rollTime(setup: ArrayLike<number>, fromMph: number, toMph: number): number {
+    const p = this.tuned(setup);
+    const hi = Math.min(toMph, 0.9 * topSpeed(p) * MPH);
+    if (!(hi > fromMph)) return Infinity;
+    const [a, b] = dragSim(p, this.car.index, [fromMph, hi]).at;
+    return b - a;
   }
 
   /** Unlocked non-curve controls. Display bounds are the editable bounds, not the full scale. */
@@ -1266,7 +1279,12 @@ function interp32(table: ArrayLike<number>, x0: number, invDx: number, x: number
   return fr(fr(f * table[i + 1]) + fr(fr(1 - f) * table[i]));
 }
 
-function dragSim(p: Phys, carIndex: number): Pick<DynoResult, 't60' | 't100' | 'quarterMile' | 'trapSpeed' | 'quarterExact'> {
+/**
+ * The game's dyno run (0-60, 0-100, quarter mile). With `marks` (mph, ascending) it also runs on until the last mark and
+ * returns the raw run time at each mark in `at` (no per-car 0-60/0-100 display factor; Infinity if never reached).
+ */
+function dragSim(p: Phys, carIndex: number, marks: number[] = []):
+  Pick<DynoResult, 't60' | 't100' | 'quarterMile' | 'trapSpeed' | 'quarterExact'> & { at: number[] } {
   const G = (o: number): number => fr(g(p, o));
   const tab = Array.from({ length: 9 }, (_, i) => G(0x200 + 4 * i));
   const idle = G(0x1f0), red = G(0x1f8), shift = G(0x1f4);
@@ -1283,6 +1301,7 @@ function dragSim(p: Phys, carIndex: number): Pick<DynoResult, 't60' | 't100' | '
   const dt = fr(1 / 60), mph = fr(MPH), cut = [fr(-3), 0, fr(1.5)];
   let gear = 0, v = 0, x = 0, t = 0, c = 1, phase = 1, just = false;
   let t60 = 0, t100 = 0, qm = 0, trap = 0, qmExact = Infinity;
+  const at = marks.map(() => 0);
   for (let step = 0; step < 0xf423f; step++) {
     const gr = gears[gear] ?? 0;
     const rpm = fr(fr(fr(fr(invR * v) * gr) * fd) * fr(9.549304));
@@ -1312,10 +1331,11 @@ function dragSim(p: Phys, carIndex: number): Pick<DynoResult, 't60' | 't100' | '
       qm = t; trap = v;
       qmExact = t - (x - QUARTER_MILE_M) / Math.max(v, 1e-6);
     }
-    if (t60 !== 0 && t100 !== 0 && qm !== 0 && trap !== 0) break;
+    for (let i = 0; i < marks.length; i++) if (at[i] === 0 && marks[i] <= fr(v * mph)) at[i] = t;
+    if (t60 !== 0 && t100 !== 0 && qm !== 0 && trap !== 0 && (!marks.length || at[marks.length - 1] !== 0)) break;
   }
   const z = (q: number): number => (q === 0 ? Infinity : q);
-  return { t60: z(t60), t100: z(t100), quarterMile: z(qm), trapSpeed: trap * MPH, quarterExact: qmExact };
+  return { t60: z(t60), t100: z(t100), quarterMile: z(qm), trapSpeed: trap * MPH, quarterExact: qmExact, at: at.map(z) };
 }
 
 function topSpeed(p: Phys): number {

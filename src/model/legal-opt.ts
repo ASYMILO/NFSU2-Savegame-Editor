@@ -10,7 +10,10 @@ import { DynoModel, ECU_OFF, SETUP_NAMES, TURBO_OFF, type CurveKind, type Phys, 
 /** Heuristic objective definitions (weights on dyno metrics). */
 export const OBJECTIVES: Record<string, { setup: number; name: string; w: Record<string, number> }> = {
   drag:    { setup: 1, name: 'Drag',    w: { quarter: 1.0, t100: 0.05,  t60: 0.05,  power: -0.0005 } },
-  circuit: { setup: 0, name: 'Circuit', w: { t60: 0.5,    t100: 0.5,   top: -0.15, power: -0.0005 } },
+  // Circuit = rolling acceleration over the lap's speeds, not the launch: laps start at speed, and on Freemont the cars spend
+  // p5-p95 of the lap at 50-120 mph (nfsu2-tuner docs/laps.md Step 15). The old 0-60/0-100 weights moved ECU torque to low rpm
+  // and lost 0.10-0.27 s per lap on the RX-8 at equal targets (same Step).
+  circuit: { setup: 0, name: 'Circuit', w: { roll: 1.0,     top: -0.15, power: -0.0005 } },
   streetx: { setup: 3, name: 'Street X',w: { t60: 1.0,    t100: 1.0,   quarter: 0.3, power: -0.0005 } },
   drift:   { setup: 2, name: 'Drift',   w: { t60: 0.5,    band: -0.01, power: -0.0002 } },
   url:     { setup: 4, name: 'URL',     w: { t60: 0.3,    t100: 0.3,   top: -0.4,  power: -0.0005 } },
@@ -20,6 +23,8 @@ export const OBJECTIVES: Record<string, { setup: number; name: string; w: Record
 export const OBJ_BY_SETUP = ['circuit', 'drag', 'drift', 'streetx', 'url'];
 
 const MPH_PER_MS = 2.237;
+/** Speed band of the circuit objective's rolling acceleration (mph). */
+const ROLL_FROM_MPH = 50, ROLL_TO_MPH = 120;
 const BIG = 99;
 const CURVE_PCTS = [1, 2, 3, 5, 8, 12, 20, 35];
 const GEAR_PCTS  = [1, 2, 3, 5, 10, 25];
@@ -121,6 +126,7 @@ export class Evaluator {
       top: fin(r.topSpeed, 0) / MPH_PER_MS,
       power: fin(r.peakPower, 0),
       band,
+      roll: this.w['roll'] ? fin(m.rollTime(setup, ROLL_FROM_MPH, ROLL_TO_MPH)) : 0,
     };
     let cost = 0;
     for (const [kk, ww] of Object.entries(this.w)) cost += ww * met[kk];
