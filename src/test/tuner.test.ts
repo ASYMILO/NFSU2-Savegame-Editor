@@ -22,13 +22,13 @@ test('preferences map to the existing objectives; the launch rule only with "str
   assert.deepEqual(legalOptions('race', 0), { objective: 'circuit', launchMin: null });
   assert.deepEqual(legalOptions('race', 4), { objective: 'url', launchMin: null });
   assert.deepEqual(legalOptions('accel', 0), { objective: 'streetx', launchMin: null });
-  assert.deepEqual(legalOptions('top', 2), { objective: 'url', launchMin: null });
+  assert.deepEqual(legalOptions('top', 2), { objective: 'top', launchMin: null });
 });
 
-test('each tab offers its own goal first and no goal twice (Street X = acceleration, URL = top speed)', () => {
+test('each tab offers its own goal first and no goal twice (Street X = acceleration; URL = lap pull, top speed as a choice)', () => {
   assert.deepEqual(goalChoices(0).map((g) => g.key), ['race', 'accel', 'top']);
   assert.deepEqual(goalChoices(3).map((g) => g.key), ['race', 'top']);
-  assert.deepEqual(goalChoices(4).map((g) => g.key), ['race', 'accel']);
+  assert.deepEqual(goalChoices(4).map((g) => g.key), ['race', 'accel', 'top']);
   for (let setup = 0; setup < 5; setup++) assert.ok(goalChoices(setup).every((g) => g.text), `tab ${setup}: every goal has words`);
 });
 

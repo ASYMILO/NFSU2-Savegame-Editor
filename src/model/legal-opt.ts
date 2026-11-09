@@ -16,7 +16,11 @@ export const OBJECTIVES: Record<string, { setup: number; name: string; w: Record
   circuit: { setup: 0, name: 'Circuit', w: { roll: 1.0,     top: -0.15, power: -0.0005 } },
   streetx: { setup: 3, name: 'Street X',w: { t60: 1.0,    t100: 1.0,   quarter: 0.3, power: -0.0005 } },
   drift:   { setup: 2, name: 'Drift',   w: { t60: 0.5,    band: -0.01, power: -0.0002 } },
-  url:     { setup: 4, name: 'URL',     w: { t60: 0.3,    t100: 0.3,   top: -0.4,  power: -0.0005 } },
+  // URL races are laps too: on the URL track Speedway Industrial #1 (4701) the RX-8 drives 50-126 mph, and the old URL weights
+  // (0.3 t60 + 0.3 t100 - 0.4 top) gave a set 0.65 s slower over two laps than the Circuit objective's set (nfsu2-tuner docs/laps.md Step 16).
+  url:     { setup: 4, name: 'URL',     w: { roll: 1.0,     top: -0.15, power: -0.0005 } },
+  // the player's "top speed" goal (tuner.ts legalOptions): the old URL weights
+  top:     { setup: 4, name: 'Top speed', w: { t60: 0.3,    t100: 0.3,   top: -0.4,  power: -0.0005 } },
 };
 
 /** Default objective name for each setup index (0=circuit,1=drag,2=drift,3=streetx,4=url). */

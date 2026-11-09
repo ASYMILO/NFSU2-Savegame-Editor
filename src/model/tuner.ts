@@ -38,13 +38,14 @@ export const GOAL_WORDS: Record<string, string> = {
   drag: 'the shortest quarter mile',
   drift: 'quick 0-60 and strong pull in the middle revs',
   streetx: 'quick 0-60 and 0-100',
-  url: 'top speed most, plus 0-60 and 0-100',
+  url: 'fast pull from 50 to 120 mph (lap speeds), plus some top speed',
+  top: 'top speed most, plus 0-60 and 0-100',
 };
 
 /** Objective and launch rule of a tab for a preference (`launchMin` is the editor's old "Protect launch" value). */
 export function legalOptions(pref: Preference, setup: number): { objective: string; launchMin: number | null } {
   if (pref === 'accel') return { objective: 'streetx', launchMin: null };
-  if (pref === 'top') return { objective: 'url', launchMin: null };
+  if (pref === 'top') return { objective: 'top', launchMin: null };
   return { objective: OBJ_BY_SETUP[setup], launchMin: null };
 }
 
