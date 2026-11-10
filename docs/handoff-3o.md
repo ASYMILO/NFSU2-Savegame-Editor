@@ -41,3 +41,31 @@ New file `src/model/handling.ts` (all logic), wired into `src/controller/tuner-c
 5. Zone 12 on 4013b (wall corner) decides the RWD / AWD result in the laps docs (item 2 of "Open after v10"): if widened and re-run, the RWD / AWD finding lines and the note may change.
 6. Not run: a human drive of the FWD default, other browsers than Brave, narrow screens.
 7. Wording: the page is English; the two slider names carry the owner's Polish in brackets and "nie zmierzone" is Polish on purpose (the brief's words).
+
+---
+
+# Round 3p-a (2026-11-10): plain words, Step 18 dose, flow check
+
+Owner, verbatim: "pamiętaj że my nie tunujemy mojego samochodu tylko tworzymy tuner dla całej społeczności graczy". All cars are test cars.
+
+## Changed
+1. **Slider texts in plain words** (`FINDINGS`, `handlingNote`, `BASIS` in `src/model/handling.ts`). No "laps repo docs/laps.md 17.2" in the UI any more: the `source` of each finding stays in the data (and the test still demands one); the code refs (FUN_005a3700 springs, FUN_005a4d80 brakes) moved to a code comment. Lines are short, key numbers only, e.g. "Peugeot 106 (FWD), half move: Freemont: -0.23 to -0.28 s. Short circuit: -0.95 s over 3 laps". "nie zmierzone" stays where nothing was measured. No number invented: each one is in laps `docs/laps.md` Steps 14-18 / r3m.
+2. **FWD default dose stays `ANTI_PUSH_DOSE = 0.5`**, now confirmed by laps `docs/laps.md` Step 18 (18.3, 18.5): at equal targets 100 % gains 2-3 times more (Civic 4013b -2.50 vs -0.92 s, 4013c -2.42 vs -1.25; Peugeot -1.20 vs -0.95); at the limit 50 % never lost more than 0.5 s, 100 % lost 2.9 s (Civic 4013b: wall limit 8 vs 14). FWD note rewritten with those numbers (the old "faster in 3 of 4 tests" sentence is gone); new Civic Si 50 % lap finding and Peugeot 50 % short-circuit -0.95 s (18.3) added to "front bites".
+   Not claimed: that 50 % avoids the spin at speed target 26 (it does not on 4013b: 58.6 deg).
+3. **Flow check on the real page** (headless Brave driven over the debug port, no page errors):
+   - Step gating: with no game file the Tuner page shows only "1. Game file"; car, "Find best setup", cards come after it. OK, nothing to fix.
+   - Progress: it had a bar, a count and seconds, but "0 of 5" for the first ~30 s. Added a percent ("40 % · 2 of 5 race types done · 42 s").
+   - Panels: "Advanced" and "What it changes" stayed open across slider moves but **closed on a tab switch** (the card was removed with `ng-if`). Now the cards are hidden with `ng-show`, so an open panel stays open until the user closes it, also across tabs (checked: open, slider, tab 2, tab 1: all still open). Cost: all cards are in the page at once.
+   - Section blocks: the handling block is a framed block with a header ("How the car drives in corners", Optional) like the game screens; its sliders sit inside.
+   - Unchanged screens: the badge "Nothing to change" is gone; the screen shows its one sentence of reason ("The Tuner does not change it, and it has no slider here.").
+4. Tests: `NFSU2_GLOBALB=<laps>/data/game/GLOBALB.BUN npm test`: **163 tests, 163 pass, 0 fail, 0 skipped**; `save.test.ts` not touched (70). One test line changed ("53.9 s a lap against 51.0 s").
+
+## Screenshots (`docs/img/r3p-*`, real saves, GLOBALB.BUN from laps `data/game/`)
+Saves are copies (scratch dir): `laps/native/profiles/p106_fac.bin` (slot 2 Peugeot 106, FWD) and `rx8_fac.bin` (slot 1 RX-8, RWD); the author fixture `testfile/treav0r` loads too.
+- `r3p-fwd-1-load-gate.png` (game file first), `-2-car.png`, `-3-optimize-progress.png`, `-4-result.png`, `-5-handling.png`
+- `r3p-rwd-*`: same shots for the RX-8 (no gate shot; the progress shots were taken at 3 s, so they show 0 %; a run takes 50-90 s here, the percent was seen at 20 / 40 / 60 % in the log).
+
+## Open
+- The cards are all in the page now (`ng-show`); the five tabs of a hand-mode car hold many SVG charts: not timed on a slow machine.
+- Panel state is per card (open in Circuit, closed in Drag until opened there).
+- Not run: other browsers than Brave, narrow screens, a human drive of the FWD default.

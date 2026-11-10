@@ -127,7 +127,7 @@
       </div>
       <div class="tuner-progress" ng-if="tuner.busy" role="status">
         <progress max="5" value="{{ tuner.done }}"></progress>
-        <span>{{ tuner.done }} of 5 race types done · {{ tuner.seconds }} s. Usually 20-50 s.</span>
+        <span>{{ tuner.done * 20 }} % · {{ tuner.done }} of 5 race types done · {{ tuner.seconds }} s. Usually 20-50 s.</span>
       </div>
     </section>
 
@@ -146,7 +146,7 @@
           <strong>{{ tab.name }}</strong><small>{{ tab.short }}</small>
         </button>
       </div>
-      <article class="hand-card tuner-card" ng-repeat="card in tuner.cards track by card.title" ng-if="tuner.card === $index">
+      <article class="hand-card tuner-card" ng-repeat="card in tuner.cards track by card.title" ng-show="tuner.card === $index">
         <h3>{{ card.title }}</h3>
         <p class="muted tuner-uses-line"><span ng-repeat="u in card.uses track by u.tab"><span ng-if="card.uses.length > 1">{{ u.tab }}: </span>career {{ u.career }}; Quick Race {{ u.quick }}.{{ $last ? '' : ' ' }}</span></p>
         <p class="tuner-same" ng-if="card.setups.length > 1">Same steps for {{ card.title }}: set each of them the same way.</p>
@@ -172,7 +172,7 @@
           <span class="muted">One copy with all 5 race types and your driving sliders.<span ng-if="tuner.how === 'hand'"> It holds exactly what the keys below give.</span> Load it in the game. Your loaded file is not changed. Keep your original backup.</span>
         </div>
         <div class="tuner-handling" ng-if="tuner.handling.length">
-          <h4>How the car drives in corners</h4>
+          <p class="tuner-screen-head"><strong>How the car drives in corners</strong> <span class="tuner-badge">Optional</span></p>
           <p class="muted">{{ tuner.handlingNote }}</p>
           <div class="tuner-feel" ng-repeat="h in tuner.handling track by h.key">
             <label><strong>{{ h.label }}</strong>
@@ -201,7 +201,7 @@
         <div class="tuner-screen" ng-repeat="scr in card.screens track by scr.name" ng-class="scr.state"
              ng-if="tuner.how === 'hand' || scr.hasFeel">
           <p class="tuner-screen-head"><strong>{{ scr.name }}</strong>
-            <span class="tuner-badge" ng-if="tuner.how === 'hand' || scr.state === 'feel'">{{ scr.badge }}</span>
+            <span class="tuner-badge" ng-if="(tuner.how === 'hand' || scr.state === 'feel') && scr.state !== 'keep' && scr.state !== 'ok'">{{ scr.badge }}</span>
             <span class="tuner-screen-text" ng-if="tuner.how === 'hand' && (scr.state === 'keep' || scr.state === 'ok')">{{ scr.text }}</span></p>
           <p class="tuner-screen-text" ng-if="scr.text && scr.state !== 'keep' && scr.state !== 'ok' && (tuner.how === 'hand' || scr.state === 'feel')">{{ scr.text }}</p>
           <div class="tuner-step" ng-if="tuner.how === 'hand'" ng-repeat="step in scr.steps track by $index" ng-class="{ done: step.done }">
