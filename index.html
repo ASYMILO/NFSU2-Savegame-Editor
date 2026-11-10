@@ -181,7 +181,7 @@
                 <span>{{ h.high }}</span></span></label>
             <small>Moves (↑ higher number, ↓ lower number): {{ h.rows }}. Now at {{ tuner.feel[h.key] || 0 }} % of the way to the ends of this car's own ranges.</small>
             <ul class="tuner-evidence">
-              <li ng-repeat="f in h.findings track by $index"><strong>{{ f.kind }}:</strong> <span ng-class="{ muted: f.text === 'nie zmierzone' }">{{ f.text }}</span><span class="muted" ng-if="f.source"> [{{ f.source }}]</span></li>
+              <li ng-repeat="f in h.findings track by $index"><strong>{{ f.kind }}:</strong> <span ng-class="{ muted: f.text === 'nie zmierzone' }">{{ f.text }}</span></li>
             </ul>
             <details class="tuner-why"><summary>What it changes</summary><small class="muted">{{ h.basis }}</small></details>
           </div>

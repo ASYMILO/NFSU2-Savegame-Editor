@@ -117,38 +117,39 @@ const R3M = 'handling-design-r3l.md 3m (tools repo docs/game-check-r3m.md)';
 const L = (step: string): string => `laps repo docs/laps.md ${step}`;
 
 /**
- * Every number the handling cards show. Copied from the docs named in `source`; test cars only (3000GT, RX-8, 350Z, Peugeot 106,
- * Civic Si). `dose` is the share of the way from the car's base set to the ends of its own box. Slip = how far the rear slides
- * sideways (degrees, or % against the base); turn rate = how fast the car turns. "kind: lap" is lap time against the same car's
- * base at the same speed targets (negative = faster).
+ * Every number the handling cards show. Copied from the docs named in `source` (kept here, NOT shown in the UI); test cars only
+ * (3000GT, RX-8, 350Z, Peugeot 106, Civic Si). `dose` is the share of the way from the car's base set to the ends of its own box.
+ * "rear slide" = peak rear slip in degrees (or % against the base); "turns" = turn rate. "kind: lap" is lap time against the same
+ * car's base at the same speed targets (negative = faster). Texts are plain words for a player: short, key numbers only.
  */
 export const FINDINGS: Record<'stable' | 'push', Finding[]> = {
   stable: [
     { car: '3000GT (AWD)', dose: '100 %', kind: 'drive', source: R3M,
-      text: 'rear slip -31 to -36 % in steady turns and -20 % when braking into a turn; turn rate -6 to -11 % in steady turns and -15 % when braking into a turn' },
+      text: 'rear slides 31-36 % less in steady turns, 20 % less braking into a turn; but it turns 6-11 % less (15 % less braking into a turn)' },
     { car: '3000GT (AWD)', dose: '50 %', kind: 'lap', source: L('14.4, 16.2'),
-      text: 'Freemont: timed lap -0.03 s (37.42 against 37.45), peak rear slip 21.5-23.2 -> 20.2 deg; short circuit 4013b: +0.50 s over 3 laps' },
-    { car: 'RX-8 (RWD)', dose: '50 %', kind: 'drive', source: L('14.4'), text: 'Freemont: peak rear slip 12.3 -> 11.7 deg' },
-    { car: 'RX-8 (RWD)', dose: '50 %', kind: 'lap', source: L('14.4, 16.2'), text: 'Freemont: timed lap -0.10 s; short circuit 4013b: +0.25 / +0.30 s over 3 laps' },
+      text: 'Freemont: -0.03 s a lap (rear slide 21.5-23.2° → 20.2°). Short circuit: +0.50 s over 3 laps (slower)' },
+    { car: 'RX-8 (RWD)', dose: '50 %', kind: 'drive', source: L('14.4'), text: 'Freemont: rear slide 12.3° → 11.7°' },
+    { car: 'RX-8 (RWD)', dose: '50 %', kind: 'lap', source: L('14.4, 16.2'), text: 'Freemont: -0.10 s a lap. Short circuit: +0.25 / +0.30 s over 3 laps (slower)' },
     { car: '350Z (RWD)', dose: '50 %', kind: 'drive', source: L('17.5'),
-      text: 'short circuit at moderate speed: peak rear slip 20.2 -> 15.9 and 17.8 -> 13.7 deg; at the car\'s limit no change (28.0 -> 28.2 deg)' },
-    { car: '350Z (RWD)', dose: '50 %', kind: 'lap', source: L('17.4'),
-      text: 'Freemont -0.40 / -0.32 s over 2 laps; short circuit 4013b +0.35 s over 3 laps (+0.52 s in the wall corner, -0.17 s elsewhere)' },
-    { car: 'Civic Si (FWD)', dose: '50 %', kind: 'drive', source: L('17.2'), text: 'Freemont: peak rear slip 10.7 / 11.1 -> 9.9 / 9.6 deg' },
-    { car: 'Peugeot 106 (FWD)', dose: '50 %', kind: 'lap', source: L('17.4'), text: 'Freemont +0.05 s, short circuit 4013b +0.08 s (slower)' },
-    { car: 'Civic Si (FWD)', dose: '50 %', kind: 'lap', source: L('17.2'), text: 'Freemont +0.22 s (slower)' },
+      text: 'short circuit, moderate speed: rear slide 20.2° → 15.9° and 17.8° → 13.7°. At the car\'s limit no change (28.0° → 28.2°)' },
+    { car: '350Z (RWD)', dose: '50 %', kind: 'lap', source: L('17.4'), text: 'Freemont: -0.40 / -0.32 s over 2 laps. Short circuit: +0.35 s over 3 laps (slower)' },
+    { car: 'Civic Si (FWD)', dose: '50 %', kind: 'drive', source: L('17.2'), text: 'Freemont: rear slide 10.7 / 11.1° → 9.9 / 9.6°' },
+    { car: 'Peugeot 106 (FWD)', dose: '50 %', kind: 'lap', source: L('17.4'), text: 'Freemont +0.05 s, short circuit +0.08 s (slower)' },
+    { car: 'Civic Si (FWD)', dose: '50 %', kind: 'lap', source: L('17.2'), text: 'Freemont: +0.22 s (slower)' },
   ],
   push: [
     { car: 'Peugeot 106 (FWD)', dose: '100 %', kind: 'drive', source: L('15.3, 17.5'),
-      text: 'peak rear slip 9.7 -> 15-20 deg; each row alone at its end: turn rate +3.8 % (front springs), +3.3 % (front bar), and +27 % after braking into a turn (brake bias)' },
+      text: 'rear slide 9.7° → 15-20°. Each change alone: turns 3.8 % more (front springs), 3.3 % more (front bar), 27 % more after braking into a turn (brake balance)' },
     { car: 'Civic Si (FWD)', dose: '100 %', kind: 'drive', source: L('17.2, 17.3'),
-      text: 'Freemont: peak rear slip 10.7 / 11.1 -> 15.6 / 16.4 deg; short circuit 4013b: wall hits from speed target 23 (base from 26), a spin at target 26' },
-    { car: 'Peugeot 106 (FWD)', dose: '50 %', kind: 'lap', source: L('17.5'), text: 'Freemont -0.23 to -0.28 s' },
-    { car: 'Peugeot 106 (FWD)', dose: '100 %', kind: 'lap', source: L('17.4'), text: 'Freemont -0.70 s over 2 laps; short circuit 4013b -1.20 s over 3 laps' },
-    { car: 'Civic Si (FWD)', dose: '100 %', kind: 'lap', source: L('17.4, 17.3'),
-      text: 'Freemont -0.03 s (noise); short circuit 4013b -1.42 s over 2 laps, but at its limit slower: full-ladder timed lap 53.9 s against 51.0 s' },
-    { car: '350Z (RWD)', dose: '50 %', kind: 'drive', source: L('17.2'), text: 'Freemont: peak rear slip 16.0 / 15.5 -> 24.6 / 22.1 deg' },
-    { car: '350Z (RWD)', dose: '50 %', kind: 'lap', source: L('17.4'), text: 'Freemont +0.83 s (slower)' },
+      text: 'Freemont: rear slide 10.7 / 11.1° → 15.6 / 16.4°. Short circuit: wall hits at a lower test speed (23, before 26), a spin at 26' },
+    { car: 'Peugeot 106 (FWD)', dose: '50 %', kind: 'lap', source: L('17.5, 18.3'), text: 'Freemont: -0.23 to -0.28 s. Short circuit: -0.95 s over 3 laps' },
+    { car: 'Peugeot 106 (FWD)', dose: '100 %', kind: 'lap', source: L('17.4'), text: 'Freemont: -0.70 s over 2 laps. Short circuit: -1.20 s over 3 laps' },
+    { car: 'Civic Si (FWD)', dose: '50 %', kind: 'lap', source: L('18.3, 18.5'),
+      text: 'Short circuit: -0.92 s and -1.25 s over 3 laps (two layouts). Freemont: no real change. At its limit never more than 0.5 s slower' },
+    { car: 'Civic Si (FWD)', dose: '100 %', kind: 'lap', source: L('17.4, 17.3, 18.3, 18.5'),
+      text: 'Short circuit: -1.42 s over 2 laps (-2.50 s over 3), but at its limit slower: 53.9 s a lap against 51.0 s (2.9 s lost). Freemont: no real change' },
+    { car: '350Z (RWD)', dose: '50 %', kind: 'drive', source: L('17.2'), text: 'Freemont: rear slide 16.0 / 15.5° → 24.6 / 22.1°' },
+    { car: '350Z (RWD)', dose: '50 %', kind: 'lap', source: L('17.4'), text: 'Freemont: +0.83 s (slower)' },
   ],
 };
 
@@ -156,11 +157,11 @@ export const FINDINGS: Record<'stable' | 'push', Finding[]> = {
 export function handlingNote(drive: Drivetrain, tab: number): string {
   if (drive === 'fwd' && DOSE_TABS.includes(tab)) {
     return `Front-wheel drive: Optimize moved the four rows ${Math.round(ANTI_PUSH_DOSE * 100)} % of the way toward the "front bites" ends. `
-      + 'At equal speed that was faster in 3 of 4 car-and-track tests and equal in the 4th (two front-wheel-drive cars, two tracks); '
-      + 'the Civic Si got worse at its limit at 100 %, and 50 % was only driven on the Peugeot. The slider shows where it stands.';
+      + 'At the same speed the full move gains 2-3 times more (Civic short circuit -2.50 s against -0.92 s). '
+      + 'At the car\'s limit half never lost more than 0.5 s, the full move lost 2.9 s. So half is the default; the slider shows where it stands.';
   }
   if (drive === 'fwd') return `Front-wheel drive: on this race type Optimize leaves the four rows as they are. Nobody drove this race type with them moved (${NOT_MEASURED}).`;
-  return 'Optimize leaves the four rows as they are. For all three rear-drive and all-wheel-drive test cars the "rear holds" ends were a little faster on the Freemont track '
+  return 'Optimize leaves the four rows as they are. On the three rear-drive and all-wheel-drive test cars the "rear holds" ends were a little faster on the Freemont track '
     + 'and slower on the short circuit, so there is no default. Move the slider if the rear steps out.';
 }
 
@@ -176,7 +177,7 @@ export function findingsFor(key: 'stable' | 'push', drive: Drivetrain): { kind: 
   for (const kind of ['drive', 'lap'] as FindingKind[]) {
     const own = FINDINGS[key].filter((f) => f.kind === kind && f.car.includes(`(${DRIVE_OF_CAR[drive]})`));
     if (!own.length) out.push({ kind: KIND_WORDS[kind], text: NOT_MEASURED, source: '' });
-    for (const f of own) out.push({ kind: KIND_WORDS[kind], text: `${f.car}, ${f.dose} of the way: ${f.text}.`, source: f.source });
+    for (const f of own) out.push({ kind: KIND_WORDS[kind], text: `${f.car}, ${f.dose === '50 %' ? 'half move' : 'full move'}: ${f.text}.`, source: f.source });
   }
   return out;
 }
@@ -202,9 +203,9 @@ export interface HandlingSlider {
   max: 100;
 }
 
-const BASIS = 'Moves Front Springs, Front Sway Bar, Rear Sway Bar and Brake Bias, each toward the end of this car\'s own box. '
-  + 'The effects are measured in the game (lap tests and bench tests with five test cars), not computed. Springs: game code FUN_005a3700; '
-  + 'brakes: FUN_005a4d80; the sway bars\' code (anti-roll term) was not found, so their effect rests on the game measurements alone.';
+// Code behind the rows (kept out of the UI): springs FUN_005a3700, brakes FUN_005a4d80; the anti-roll (sway bar) term of the game was not found.
+const BASIS = 'Moves front springs, front bar, rear bar and brake balance, each toward the end of this car\'s own range. '
+  + 'The effects were measured in the game (lap tests and bench tests with five test cars), not computed. The sway bars\' effect rests on those measurements alone.';
 
 /**
  * The symptom sliders a car and tab can use. A slider is offered when at least one of the four rows has room toward its ends;

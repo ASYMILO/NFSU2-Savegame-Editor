@@ -127,7 +127,7 @@ test('measured words: every number has a source, a drivetrain with no test says 
   // rear-drive: no bench for the anti-push direction other than the 350Z; FWD stable has no bench except the Civic
   assert.ok(lines('push', 'rwd').some((l) => /350Z/.test(l.text) && /\+0\.83/.test(l.text)));
   assert.ok(lines('push', 'fwd').some((l) => /-1\.42/.test(l.text)), 'the Civic\'s 4013 gain comes with its limit');
-  assert.ok(lines('push', 'fwd').some((l) => /53\.9 s against 51\.0 s/.test(l.text)));
+  assert.ok(lines('push', 'fwd').some((l) => /53\.9 s a lap against 51\.0 s/.test(l.text)));
   assert.match(handlingNote('awd', 0), /no default/);
   assert.match(handlingNote('fwd', 0), /50 %/);
   assert.match(handlingNote('fwd', 1), new RegExp(NOT_MEASURED));
