@@ -28,7 +28,7 @@ export const OBJ_BY_SETUP = ['circuit', 'drag', 'drift', 'streetx', 'url'];
 
 const MPH_PER_MS = 2.237;
 /** Speed band of the circuit objective's rolling acceleration (mph). */
-const ROLL_FROM_MPH = 50, ROLL_TO_MPH = 120;
+export const ROLL_FROM_MPH = 50, ROLL_TO_MPH = 120;
 const BIG = 99;
 const CURVE_PCTS = [1, 2, 3, 5, 8, 12, 20, 35];
 const GEAR_PCTS  = [1, 2, 3, 5, 10, 25];
@@ -480,6 +480,15 @@ function solveGearEntry(
 }
 
 // ---- gameNumbers -------------------------------------------------------------------------------
+
+/**
+ * The number the Circuit and URL tabs optimize: seconds to pull from 50 to 120 mph at full throttle (DynoModel.rollTime), in
+ * hundredths. null when the car cannot do it (the top of the band is cut to 90 % of its top speed; below 50 mph there is no pull).
+ */
+export function rollPull(model: DynoModel, setup: ArrayLike<number>): number | null {
+  const t = model.rollTime(setup, ROLL_FROM_MPH, ROLL_TO_MPH);
+  return Number.isFinite(t) ? Math.round(t * 100) / 100 : null;
+}
 
 export interface GameNumbers {
   t60: number | null;

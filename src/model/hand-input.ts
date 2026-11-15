@@ -11,7 +11,7 @@ import { SETUP_NAMES, type DynoModel } from './dyno.js';
 import {
   CurveScreen, NitroScreen, openRow, pressFinalDrive, pressRowState, resetRow, rowInfo, rowScale, rowShown, type RowInfo, type RowState,
 } from './tune-keys.js';
-import { Evaluator, gameNumbers, OBJ_BY_SETUP, type GameNumbers } from './legal-opt.js';
+import { Evaluator, gameNumbers, OBJECTIVES, OBJ_BY_SETUP, rollPull, type GameNumbers } from './legal-opt.js';
 
 /** One screen of the game's tuning menu and the presses it takes. */
 export interface SliderPlan {
@@ -55,6 +55,11 @@ export interface HandInputPlan {
   b: GameNumbers;
   /** A minus B, in the dyno screen's units (s, s, km/h, bhp). */
   diff: { t60: number | null; t100: number | null; topKmh: number; powerBhp: number };
+  /**
+   * The 50-120 mph pull in seconds (the number the lap tabs optimize, legal-opt.ts rollPull) for the keys (`a`), the save-only
+   * optimum (`b`) and their difference a - b. null on tabs whose objective is not the pull (Drag, Drift, Street X, top speed).
+   */
+  roll: { a: number | null; b: number | null; diff: number | null } | null;
 }
 
 const MAX_PRESSES_PER_VISIT = 12;
@@ -398,6 +403,7 @@ export function planHandInput(model: DynoModel, saved: Uint8Array, optimum: Uint
   return {
     setup, plans, presses: plans.reduce((n, p) => n + p.presses, 0), a, b,
     diff: { t60: d(a.t60, b.t60), t100: d(a.t100, b.t100), topKmh: Math.round((a.topKmh - b.topKmh) * 10) / 10, powerBhp: Math.round((a.powerBhp - b.powerBhp) * 10) / 10 },
+    roll: OBJECTIVES[obj]?.w['roll'] ? { a: rollPull(model, setup), b: rollPull(model, optimum), diff: d(rollPull(model, setup), rollPull(model, optimum)) } : null,
   };
 }
 

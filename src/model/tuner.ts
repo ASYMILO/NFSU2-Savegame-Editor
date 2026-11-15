@@ -193,11 +193,19 @@ export function saveWithTabs(save: Uint8Array, slot: number, results: TabResult[
 /**
  * The best (save only) against the keys, in numbers: `diff` is keys minus best (hand-input.ts planHandInput), so a plus time
  * means the best is quicker. Below what the game's dyno screen shows (0.01 s, 0.1 km/h) counts as the same.
+ * On a lap tab (`roll` given) the best is picked for the 50-120 mph pull, so that comes first and a 0-60 / 0-100 that goes the
+ * other way is named as a launch figure, not left as "slower" next to the word best (audit M6, m8).
  */
-export function gapWords(diff: HandInputPlan['diff'], unit = 'km/h'): string {
+export function gapWords(diff: HandInputPlan['diff'], unit = 'km/h', roll: HandInputPlan['roll'] = null): string {
   const out: string[] = [];
-  for (const [label, d] of [['0-60', diff.t60], ['0-100', diff.t100]] as const) {
-    if (d !== null && Math.abs(d) >= 0.005) out.push(`${label} ${Math.abs(d).toFixed(2)} s ${d > 0 ? 'quicker' : 'slower'}`);
+  const time = (label: string, d: number | null): string | null => (d !== null && Math.abs(d) >= 0.005 ? `${label} ${Math.abs(d).toFixed(2)} s ${d > 0 ? 'quicker' : 'slower'}` : null);
+  if (roll) {
+    const pull = time('50-120 mph pull', roll.diff);
+    if (pull) out.push(pull);
+    const launch = [time('0-60', diff.t60), time('0-100', diff.t100)].filter((x): x is string => x !== null);
+    if (launch.length) out.push(`${launch.join(', ')} (a launch figure, not what a lap race counts)`);
+  } else {
+    for (const w of [time('0-60', diff.t60), time('0-100', diff.t100)]) if (w) out.push(w);
   }
   if (Math.abs(diff.topKmh) >= 0.05) out.push(`top speed ${Math.abs(diff.topKmh).toFixed(1)} ${unit} ${diff.topKmh < 0 ? 'higher' : 'lower'}`);
   return out.length ? out.join(', ') : 'the same';
@@ -207,7 +215,8 @@ export function gapWords(diff: HandInputPlan['diff'], unit = 'km/h'): string {
 export function largestGap(results: TabResult[]): string {
   let best: { d: number; text: string } | null = null;
   for (const r of results) {
-    for (const [label, d] of [['0-60', r.plan.diff.t60], ['0-100', r.plan.diff.t100]] as const) {
+    const rows = r.plan.roll ? [['50-120 mph pull', r.plan.roll.diff]] as const : [['0-60', r.plan.diff.t60], ['0-100', r.plan.diff.t100]] as const;
+    for (const [label, d] of rows) {
       if (d !== null && d >= 0.005 && (!best || d > best.d)) best = { d, text: `${d.toFixed(2)} s quicker (${TAB_NAMES[r.setup]}, ${label})` };
     }
   }

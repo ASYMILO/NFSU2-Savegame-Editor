@@ -194,6 +194,8 @@ export interface HandlingSlider {
   high: string;
   /** What it moves, in the game's row names. */
   rows: string;
+  /** One plain sentence on what was measured; the numbers are folded under "What was measured". */
+  line: string;
   findings: { kind: string; text: string; source: string }[];
   /** Where the evidence comes from, and what is not known (shown folded). */
   basis: string;
@@ -203,6 +205,20 @@ export interface HandlingSlider {
   min: 0;
   max: 100;
 }
+
+/** One plain sentence per slider and drivetrain (what the lines in {@link FINDINGS} say, no numbers; audit m7). */
+export const PLAIN_LINES: Record<'stable' | 'push', Record<Drivetrain, string>> = {
+  stable: {
+    fwd: 'Two front-drive test cars tried it: no gain, a little slower (on Freemont for both, on the short track for one).',
+    awd: 'One all-wheel-drive test car tried it: a little slower on the short track, no change on Freemont.',
+    rwd: 'Two rear-drive test cars tried it: no lap-time loss on either, but one touched the wall at a speed the standard setup passes.',
+  },
+  push: {
+    fwd: 'Two front-drive test cars tried it: faster laps on the short track; on Freemont faster for one car and no change for the other.',
+    awd: NOT_MEASURED,
+    rwd: 'One rear-drive test car tried it: slower on Freemont.',
+  },
+};
 
 // Code behind the rows (kept out of the UI): springs FUN_005a3700, brakes FUN_005a4d80; the anti-roll (sway bar) term of the game was not found.
 const BASIS = 'Moves front springs, front bar, rear bar and brake balance, each toward the end of this car\'s own range. '
@@ -221,13 +237,13 @@ export function handlingSliders(model: DynoModel, setup: ArrayLike<number>, driv
   if (rows.some((r) => room(model, setup, r, 1))) {
     out.push({
       key: HANDLING_KEYS.stable, which: 'stable', label: 'The rear steps out in corners (tył ucieka)', low: 'As it is', high: 'Rear holds more',
-      rows: names(1), findings: findingsFor('stable', drive), basis: BASIS, start: d.stable, min: 0, max: 100,
+      rows: names(1), line: PLAIN_LINES.stable[drive], findings: findingsFor('stable', drive), basis: BASIS, start: d.stable, min: 0, max: 100,
     });
   }
   if (rows.some((r) => room(model, setup, r, -1))) {
     out.push({
       key: HANDLING_KEYS.push, which: 'push', label: 'The front does not turn in, it pushes wide (przód nie skręca / pcha)', low: 'As it is', high: 'Front bites more',
-      rows: names(-1), findings: findingsFor('push', drive), basis: BASIS, start: d.push, min: 0, max: 100,
+      rows: names(-1), line: PLAIN_LINES.push[drive], findings: findingsFor('push', drive), basis: BASIS, start: d.push, min: 0, max: 100,
     });
   }
   return out;

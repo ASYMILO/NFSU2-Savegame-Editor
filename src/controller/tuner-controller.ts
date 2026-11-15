@@ -11,7 +11,7 @@ import { slotCount } from '../model/layout.js';
 import { TRAFFIC_CARS } from '../data/traffic-cars.js';
 import { carName } from '../data/car-names.js';
 import { AERO_PARTS, buildVirtualSave, installedForLevels, levelsOf, PART_LEVEL_CATEGORIES, withAero } from '../model/virtual-save.js';
-import { gameNumbers, type GameNumbers } from '../model/legal-opt.js';
+import { gameNumbers, rollPull, type GameNumbers } from '../model/legal-opt.js';
 import { ROW_LABELS, ROW_ORDER, shownText } from '../model/hand-input.js';
 import { NitroScreen, rowInfo } from '../model/tune-keys.js';
 import { FEEL_SLIDERS, feelSliders, withFeel, type Feel } from '../model/feel.js';
@@ -504,6 +504,10 @@ function cards(src: Source, results: TabResult[], goals: Preference[], base: Uin
       { label: 'Top speed', a: top(a), b: top(b), diff: sign(Number(dtop.toFixed(1)), unit, 1), zero: Math.abs(dtop) < 0.05 },
       { label: 'Power', a: bhp(a.powerBhp), b: bhp(b.powerBhp), diff: sign(Number(dbhp.toFixed(1)), 'bhp', 1), zero: Math.abs(dbhp) < 0.05 },
     ];
+    // lap tabs: the number the best is picked on (50-120 mph pull), after the dyno rows the game shows
+    const pull = r.plan.roll, nowPull = pull ? rollPull(src.model, r.start) : null;
+    const secs = (v: number | null): string => (v === null ? '–' : `${v.toFixed(2)} s`);
+    if (pull) table.push({ label: '50-120 mph pull', a: secs(pull.a), b: secs(pull.b), diff: sign(pull.diff, 's', 2), zero: pull.diff === null || Math.abs(pull.diff) < 0.005 });
     for (const row of table) if (row.zero) row.diff = 'same';
     return {
       setups: group.map((x) => x.setup),
@@ -515,6 +519,7 @@ function cards(src: Source, results: TabResult[], goals: Preference[], base: Uin
         { label: '0-100 mph', now: sec(now.t100), after: sec(a.t100) },
         { label: 'Top speed', now: top(now), after: top(a) },
         { label: 'Power', now: bhp(now.powerBhp), after: bhp(a.powerBhp) },
+        ...(pull ? [{ label: '50-120 mph pull', now: secs(nowPull), after: secs(pull.a) }] : []),
       ],
       goal: GOAL_WORDS[legalOptions(goals[r.setup], r.setup).objective] ?? '',
       goals: goalChoices(r.setup),
@@ -524,7 +529,7 @@ function cards(src: Source, results: TabResult[], goals: Preference[], base: Uin
       note: group.some((x) => x.setup === 1) ? 'In Drag races you shift by hand. The dyno shifts by itself.' : '',
       advanced: advancedRows(src.model, r.start, { base: base[r.setup], ...layersOf(src.model, r.start, base[r.setup], feels[r.setup] ?? {}, r.setup) }),
       table,
-      gap: gapWords({ ...diff, topKmh: Number(dtop.toFixed(1)) }, unit),
+      gap: gapWords({ ...diff, topKmh: Number(dtop.toFixed(1)) }, unit, pull),
       // only the by-hand list: the optimizer's own sheet has its own entry rules ("do not reset the Drivetrain"), which
       // differ from the steps above
       sheet: r.handSheet,

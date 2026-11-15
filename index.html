@@ -123,7 +123,7 @@
       <p class="muted" ng-if="tuner.source !== 'save'">You get the keys to press in the game. To get a changed save, open the Tuner from a car slot of your save.</p>
       <div class="editor-row">
         <button type="button" class="profile-action-btn tuner-go" ng-click="tunerOptimize()" ng-disabled="tuner.busy">{{ tuner.busy ? 'Working…' : 'Find best setup' }}</button>
-        <span class="muted" ng-if="!tuner.busy">Works out ECU, Turbo and Drivetrain for all 5 race types at once.</span>
+        <span class="muted" ng-if="!tuner.busy">Works out ECU, Turbo and Drivetrain for all 5 race types at once. On a front-wheel-drive car it also moves four suspension and brake rows on Circuit and URL (you can switch that off below the result).</span>
       </div>
       <div class="tuner-progress" ng-if="tuner.busy" role="status">
         <progress max="5" value="{{ tuner.done }}"></progress>
@@ -165,7 +165,7 @@
               <td ng-class="{ 'tuner-pick': tuner.how === 'save', muted: tuner.how === 'hand' }">{{ card.table[$index].b }}</td></tr></tbody>
           </table>
         </div>
-        <p class="tuner-gap">Best setup against keys: <strong>{{ card.gap }}</strong>. Both are fair: inside the game's limits.</p>
+        <p class="tuner-gap">Save-only setup compared with the keys' setup: <strong>{{ card.gap }}</strong>. Both are fair: inside the game's limits.</p>
         <p class="muted" ng-if="card.note">{{ card.note }}</p>
         <div class="editor-row" ng-if="tuner.canDownload">
           <button type="button" class="profile-action-btn tuner-go" ng-click="tunerDownload()" ng-disabled="tuner.stale || tuner.busy">{{ tuner.how === 'hand' ? 'Download save (same as the keys)' : 'Download save (best setup)' }}</button>
@@ -180,12 +180,15 @@
                 <input type="range" ng-attr-min="{{ h.min }}" ng-attr-max="{{ h.max }}" step="25" ng-model="tuner.feel[h.key]" ng-model-options="{ updateOn: 'change' }" ng-change="tunerFeel(h.key)" ng-disabled="tuner.busy" aria-label="{{ h.label }}: {{ h.low }} to {{ h.high }}">
                 <span>{{ h.high }}</span></span></label>
             <small>Moves (↑ higher number, ↓ lower number): {{ h.rows }}. Now at {{ tuner.feel[h.key] || 0 }} % of the way to the ends of this car's own ranges.</small>
-            <ul class="tuner-evidence">
-              <li ng-repeat="f in h.findings track by $index"><strong>{{ f.kind }}:</strong> <span ng-class="{ muted: f.text === 'nie zmierzone' }">{{ f.text }}</span></li>
-            </ul>
+            <p class="muted tuner-line"><small ng-class="{ muted: h.line === 'nie zmierzone' }">{{ h.line }}</small></p>
+            <details class="tuner-why"><summary>What was measured</summary>
+              <ul class="tuner-evidence">
+                <li ng-repeat="f in h.findings track by $index"><strong>{{ f.kind }}:</strong> <span ng-class="{ muted: f.text === 'nie zmierzone' }">{{ f.text }}</span></li>
+              </ul>
+            </details>
             <details class="tuner-why"><summary>What it changes</summary><small class="muted">{{ h.basis }}</small></details>
           </div>
-          <p class="muted"><small>Both sliders use the same four rows in opposite directions, so only one can be on. Test cars only; nobody measured every car.</small></p>
+          <p class="muted"><small>Both sliders use the same four rows in opposite directions, so only one can be on. Brake Bias is also moved by the Braking slider above. The slider positions are not kept: next time the default for your car comes back. Test cars only; nobody measured every car.</small></p>
         </div>
         <details class="hand-older tuner-advanced">
           <summary>Advanced: every row ({{ card.advanced.length }}) with its value, range and what changed it</summary>

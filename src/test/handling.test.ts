@@ -133,6 +133,14 @@ test('measured words: every number has a source, a drivetrain with no test says 
   assert.match(handlingNote('fwd', 1), new RegExp(NOT_MEASURED));
 });
 
+test('lap tabs carry the 50-120 mph pull (the number they optimize); Drag, Drift and Street X do not (audit M6)', { skip: SKIP }, () => {
+  const m = modelOf('CIVIC'), start = startAfterC(m);
+  const at = (k: number): ReturnType<typeof planTab> => planTab(m, k, start, start, 'race');
+  for (const k of [0, 4]) assert.ok(at(k).plan.roll && at(k).plan.roll!.a! > 3 && at(k).plan.roll!.a === at(k).plan.roll!.b, `tab ${k}`);
+  for (const k of [1, 2, 3]) assert.equal(at(k).plan.roll, null, `tab ${k}`);
+  assert.equal(planTab(m, 4, start, start, 'top').plan.roll, null, 'the top-speed goal is not the pull');
+});
+
 test('advanced list: every row the car has, with who changed it; keys reach the handling target within a byte', { skip: SKIP }, () => {
   const m = modelOf('PEUGOT106'), start = startAfterC(m);
   const felt = withFeel(m, start, start, {});

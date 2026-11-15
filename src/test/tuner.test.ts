@@ -44,7 +44,7 @@ test('stored Tuner choices: malformed parts are dropped, slider positions clampe
 test('tabs with the same start, keys and result share a card', () => {
   const fake = (setup: number, a: number, b: number): TabResult => ({
     setup, start: Uint8Array.of(1), optimum: Uint8Array.of(b), legalSheet: '', handSheet: '',
-    plan: { setup: Uint8Array.of(a), plans: [], presses: 0, a: null!, b: null!, diff: null! },
+    plan: { setup: Uint8Array.of(a), plans: [], presses: 0, a: null!, b: null!, diff: null!, roll: null },
   });
   const groups = groupTabs([fake(0, 5, 6), fake(1, 5, 7), fake(2, 5, 6), fake(3, 4, 6), fake(4, 5, 6)]);
   assert.deepEqual(groups.map((g) => g.map((r) => r.setup)), [[0, 2, 4], [1], [3]]);
@@ -194,6 +194,13 @@ test('best against keys in numbers: plus = the best is quicker; below the dyno s
   assert.equal(gapWords({ t60: 0.02, t100: 0, topKmh: -1.2, powerBhp: 0 }), '0-60 0.02 s quicker, top speed 1.2 km/h higher');
   assert.equal(gapWords({ t60: 0.004, t100: null, topKmh: 0.04, powerBhp: 3 }), 'the same');
   assert.equal(gapWords({ t60: -0.01, t100: 0.03, topKmh: 0, powerBhp: 0 }), '0-60 0.01 s slower, 0-100 0.03 s quicker');
+});
+
+test('best against keys on a lap tab: the 50-120 mph pull leads, a launch figure going the other way is named, not left as "slower"', () => {
+  const diff = { t60: -0.02, t100: 0, topKmh: 0, powerBhp: 0 };
+  assert.equal(gapWords(diff, 'km/h', { a: 8.3, b: 8.25, diff: 0.05 }), '50-120 mph pull 0.05 s quicker, 0-60 0.02 s slower (a launch figure, not what a lap race counts)');
+  assert.equal(gapWords(diff, 'km/h', { a: 8.3, b: 8.3, diff: 0 }), '0-60 0.02 s slower (a launch figure, not what a lap race counts)');
+  assert.equal(gapWords({ ...diff, t60: 0 }, 'km/h', { a: 8.3, b: 8.3, diff: 0.004 }), 'the same');
 });
 
 test('download "same as the keys": the save holds, on all 5 tabs of the 3000GT, the bytes the card\'s keys give', { skip: SKIP }, () => {
