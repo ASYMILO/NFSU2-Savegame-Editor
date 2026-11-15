@@ -47,7 +47,7 @@ test('default dose: none on rear-drive and all-wheel-drive, ANTI_PUSH_DOSE on th
   for (let tab = 0; tab < 5; tab++) {
     assert.deepEqual(handlingDefault('fwd', tab), { stable: 0, push: DOSE_TABS.includes(tab) ? Math.round(ANTI_PUSH_DOSE * 100) : 0 }, `fwd tab ${tab}`);
   }
-  assert.deepEqual(DOSE_TABS, [0, 4], 'Circuit and URL only: the tabs the lap tests drove');
+  assert.deepEqual(DOSE_TABS, [0], 'Circuit only: URL was driven in the fix round and showed no gain (laps repo Step 20.3)');
   assert.ok(ANTI_PUSH_DOSE > 0 && ANTI_PUSH_DOSE <= 1);
 });
 

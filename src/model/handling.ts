@@ -55,10 +55,11 @@ export const HANDLING_ROWS: { param: number; stable: 1 | -1 }[] = [
 export const ANTI_PUSH_DOSE = 0.5;
 
 /**
- * The tabs that get the default dose: the lap races (Circuit, and URL, whose tab was made from the same objective in
- * b0a1fa3). The tests drove the Circuit tab's set on closed tracks. Drag (straight line), Drift and Street X were not driven.
+ * The tab that gets the default dose: Circuit, the closed-circuit lap tests drove it. URL was driven in the fix round (laps repo
+ * Step 20.3, Civic Si, track 4701, 50 %): no gain at the same speed (laps 1-2 -0.08 s, five laps +0.18 s, one lap +0.25 s slower),
+ * so URL is out: the default is written only where a measurement shows a gain. Drag (straight line), Drift and Street X were not driven.
  */
-export const DOSE_TABS = [0, 4];
+export const DOSE_TABS = [0];
 
 /** Slider positions, 0..100 each; they use the same four rows in opposite directions, so only one is above 0. */
 export interface Handling { stable: number; push: number }
@@ -149,6 +150,10 @@ export const FINDINGS: Record<'stable' | 'push', Finding[]> = {
       text: 'Short circuit, same speed: -1.25 s over 3 laps on one layout; on the other -0.53 s over 2 laps (a wall touch in lap 2 made lap 3 run one zone slower, and it was still 0.38 s faster). Freemont: no change. At its limit never more than 0.5 s slower' },
     { car: 'Civic Si (FWD)', dose: '100 %', kind: 'lap', source: L('17.4, 17.3, 18.3, 18.5'),
       text: 'Short circuit, same speed: -1.42 s over 2 laps on one layout, -2.42 s over 3 laps on the other. At its limit slower on one layout (53.9 s a lap against 51.0 s, 2.9 s lost) and faster on the other (about 0.4 s). Freemont: no change' },
+    { car: 'Civic Si (FWD)', dose: '50 %', kind: 'lap', source: L('20.3'),
+      text: 'URL track (speedway): no gain at the same speed (-0.08 s over 2 laps, +0.18 s over 5 laps, one lap 0.25 s slower; rear slide 5.6-5.8° → 5.5-5.6° at moderate speed, peak 10.5° → 14.0° at its limit)' },
+    { car: 'Golf (FWD)', dose: '50 %', kind: 'lap', source: L('20.3'),
+      text: 'Short circuit (one layout), same speed: -1.53 s over 3 laps and -0.67 s in the 4th (-2.2 s over 4 laps); at its limit about 0.7 s a lap faster' },
     { car: '350Z (RWD)', dose: '50 %', kind: 'drive', source: L('17.2'), text: 'Freemont: rear slide 16.0 / 15.5° → 24.6 / 22.1°' },
     { car: '350Z (RWD)', dose: '50 %', kind: 'lap', source: L('17.4'), text: 'Freemont: +0.83 s (slower)' },
   ],
@@ -160,6 +165,10 @@ export function handlingNote(drive: Drivetrain, tab: number): string {
     return `Front-wheel drive: Optimize moved the four rows ${Math.round(ANTI_PUSH_DOSE * 100)} % of the way toward the "front bites" ends. `
       + 'At the same speed the full move gains about 2 to 3 times more (Civic short circuit: -2.42 s against -1.25 s on one layout, -1.42 s against -0.53 s over 2 laps on the other). '
       + 'At the car\'s limit half never lost more than 0.5 s, the full move lost 2.9 s. So half is the default; the slider shows where it stands.';
+  }
+  if (drive === 'fwd' && tab === 4) {
+    return 'Front-wheel drive: on URL Optimize leaves the four rows as they are. One test car (Civic Si, half move) drove a URL track: '
+      + 'no gain at the same speed (-0.08 s over 2 laps, +0.18 s over 5 laps). Move the slider if the front pushes wide.';
   }
   if (drive === 'fwd') return `Front-wheel drive: on this race type Optimize leaves the four rows as they are. Nobody drove this race type with them moved (${NOT_MEASURED}).`;
   return 'Optimize leaves the four rows as they are. On the three rear-drive and all-wheel-drive test cars the "rear holds" ends gave no steady gain at the same speed: '
