@@ -48,8 +48,9 @@ export const HANDLING_ROWS: { param: number; stable: 1 | -1 }[] = [
 /**
  * THE dose: how far Optimize moves the four rows from where they are toward the anti-push ends on a front-wheel-drive car
  * (0.5 = halfway; 1 = to the ends of the car's own box). Measured: Peugeot 106 at 50 % -0.23..-0.28 s on Freemont (laps repo
- * Step 17.5), at 100 % -0.70 / -1.20 s; the Civic Si at 100 % hits the wall earlier on the short circuit and at 50 % was never
- * driven. A parallel round (v11) measures 50 % against 100 %: change this one number when it answers.
+ * Step 17.5), at 100 % -0.70 / -0.97 s; the Civic Si at 100 % gains 2-3 times what 50 % gains at the same speed, but at its limit
+ * loses 2.9 s on one short-circuit layout and gains 0.4 s on the other; 50 % never lost more than 0.5 s (laps repo Step 18.5). The
+ * dose is relative to each car's own box, so the same 50 % moves each car's bytes by a different amount (audit Question 2).
  */
 export const ANTI_PUSH_DOSE = 0.5;
 
@@ -127,14 +128,14 @@ export const FINDINGS: Record<'stable' | 'push', Finding[]> = {
     { car: '3000GT (AWD)', dose: '100 %', kind: 'drive', source: R3M,
       text: 'rear slides 31-36 % less in steady turns, 20 % less braking into a turn; but it turns 6-11 % less (15 % less braking into a turn)' },
     { car: '3000GT (AWD)', dose: '50 %', kind: 'lap', source: L('14.4, 16.2'),
-      text: 'Freemont: -0.03 s a lap (rear slide 21.5-23.2° → 20.2°). Short circuit: +0.50 s over 3 laps (slower)' },
+      text: 'Freemont: no change (-0.03 s, inside the noise; rear slide 21.5-23.2° → 20.2°). Short circuit, same speed: +0.23 s over 2 laps (slower), the same on both layouts (the first one repeated to the frame)' },
     { car: 'RX-8 (RWD)', dose: '50 %', kind: 'drive', source: L('14.4'), text: 'Freemont: rear slide 12.3° → 11.7°' },
-    { car: 'RX-8 (RWD)', dose: '50 %', kind: 'lap', source: L('14.4, 16.2'), text: 'Freemont: -0.10 s a lap. Short circuit: +0.25 / +0.30 s over 3 laps (slower)' },
+    { car: 'RX-8 (RWD)', dose: '50 %', kind: 'lap', source: L('14.4, 16.2'), text: 'Freemont: no change (-0.10 s, one run each). Short circuit, same speed: -0.05 s over 2 laps on one layout and 0.00 s on the other (each a wall touch for one lap); no loss anywhere' },
     { car: '350Z (RWD)', dose: '50 %', kind: 'drive', source: L('17.5'),
       text: 'short circuit, moderate speed: rear slide 20.2° → 15.9° and 17.8° → 13.7°. At the car\'s limit no change (28.0° → 28.2°)' },
-    { car: '350Z (RWD)', dose: '50 %', kind: 'lap', source: L('17.4'), text: 'Freemont: -0.40 / -0.32 s over 2 laps. Short circuit: +0.35 s over 3 laps (slower)' },
+    { car: '350Z (RWD)', dose: '50 %', kind: 'lap', source: L('17.4'), text: 'Freemont: -0.40 / -0.32 s over 2 laps (the factory set touches the wall at that speed, this one does not). Short circuit, same speed: -0.10 s over 2 laps, but this set touches the wall in the last corner at a speed the factory set passes' },
     { car: 'Civic Si (FWD)', dose: '50 %', kind: 'drive', source: L('17.2'), text: 'Freemont: rear slide 10.7 / 11.1° → 9.9 / 9.6°' },
-    { car: 'Peugeot 106 (FWD)', dose: '50 %', kind: 'lap', source: L('17.4'), text: 'Freemont +0.05 s, short circuit +0.08 s (slower)' },
+    { car: 'Peugeot 106 (FWD)', dose: '50 %', kind: 'lap', source: L('17.4'), text: 'Freemont +0.05 s, short circuit +0.05 s over 2 laps at the same speed (slower)' },
     { car: 'Civic Si (FWD)', dose: '50 %', kind: 'lap', source: L('17.2'), text: 'Freemont: +0.22 s (slower)' },
   ],
   push: [
@@ -142,12 +143,12 @@ export const FINDINGS: Record<'stable' | 'push', Finding[]> = {
       text: 'rear slide 9.7° → 15-20°. Each change alone: turns 3.8 % more (front springs), 3.3 % more (front bar), 27 % more after braking into a turn (brake balance)' },
     { car: 'Civic Si (FWD)', dose: '100 %', kind: 'drive', source: L('17.2, 17.3'),
       text: 'Freemont: rear slide 10.7 / 11.1° → 15.6 / 16.4°. Short circuit: wall hits at a lower test speed (23, before 26), a spin at 26' },
-    { car: 'Peugeot 106 (FWD)', dose: '50 %', kind: 'lap', source: L('17.5, 18.3'), text: 'Freemont: -0.23 to -0.28 s. Short circuit: -0.95 s over 3 laps' },
-    { car: 'Peugeot 106 (FWD)', dose: '100 %', kind: 'lap', source: L('17.4'), text: 'Freemont: -0.70 s over 2 laps. Short circuit: -1.20 s over 3 laps' },
+    { car: 'Peugeot 106 (FWD)', dose: '50 %', kind: 'lap', source: L('17.5, 18.3'), text: 'Freemont: -0.23 to -0.28 s. Short circuit: -0.95 s over 3 laps at the same speed' },
+    { car: 'Peugeot 106 (FWD)', dose: '100 %', kind: 'lap', source: L('17.4'), text: 'Freemont: -0.70 s over 2 laps. Short circuit: -0.97 s over 2 laps at the same speed' },
     { car: 'Civic Si (FWD)', dose: '50 %', kind: 'lap', source: L('18.3, 18.5'),
-      text: 'Short circuit: -0.92 s and -1.25 s over 3 laps (two layouts). Freemont: no real change. At its limit never more than 0.5 s slower' },
+      text: 'Short circuit, same speed: -1.25 s over 3 laps on one layout; on the other -0.53 s over 2 laps (a wall touch in lap 2 made lap 3 run one zone slower, and it was still 0.38 s faster). Freemont: no change. At its limit never more than 0.5 s slower' },
     { car: 'Civic Si (FWD)', dose: '100 %', kind: 'lap', source: L('17.4, 17.3, 18.3, 18.5'),
-      text: 'Short circuit: -1.42 s over 2 laps (-2.50 s over 3), but at its limit slower: 53.9 s a lap against 51.0 s (2.9 s lost). Freemont: no real change' },
+      text: 'Short circuit, same speed: -1.42 s over 2 laps on one layout, -2.42 s over 3 laps on the other. At its limit slower on one layout (53.9 s a lap against 51.0 s, 2.9 s lost) and faster on the other (about 0.4 s). Freemont: no change' },
     { car: '350Z (RWD)', dose: '50 %', kind: 'drive', source: L('17.2'), text: 'Freemont: rear slide 16.0 / 15.5° → 24.6 / 22.1°' },
     { car: '350Z (RWD)', dose: '50 %', kind: 'lap', source: L('17.4'), text: 'Freemont: +0.83 s (slower)' },
   ],
@@ -157,12 +158,12 @@ export const FINDINGS: Record<'stable' | 'push', Finding[]> = {
 export function handlingNote(drive: Drivetrain, tab: number): string {
   if (drive === 'fwd' && DOSE_TABS.includes(tab)) {
     return `Front-wheel drive: Optimize moved the four rows ${Math.round(ANTI_PUSH_DOSE * 100)} % of the way toward the "front bites" ends. `
-      + 'At the same speed the full move gains 2-3 times more (Civic short circuit -2.50 s against -0.92 s). '
+      + 'At the same speed the full move gains about 2 to 3 times more (Civic short circuit: -2.42 s against -1.25 s on one layout, -1.42 s against -0.53 s over 2 laps on the other). '
       + 'At the car\'s limit half never lost more than 0.5 s, the full move lost 2.9 s. So half is the default; the slider shows where it stands.';
   }
   if (drive === 'fwd') return `Front-wheel drive: on this race type Optimize leaves the four rows as they are. Nobody drove this race type with them moved (${NOT_MEASURED}).`;
-  return 'Optimize leaves the four rows as they are. On the three rear-drive and all-wheel-drive test cars the "rear holds" ends were a little faster on the Freemont track '
-    + 'and slower on the short circuit, so there is no default. Move the slider if the rear steps out.';
+  return 'Optimize leaves the four rows as they are. On the three rear-drive and all-wheel-drive test cars the "rear holds" ends gave no steady gain at the same speed: '
+    + 'nothing measurable on one track, a small loss for the all-wheel-drive car on the other, and a wall touch for the 350Z. So there is no default. Move the slider if the rear steps out.';
 }
 
 /** The words for something nobody measured. Never a guess. */
