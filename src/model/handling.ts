@@ -223,7 +223,7 @@ export const PLAIN_LINES: Record<'stable' | 'push', Record<Drivetrain, string>> 
     rwd: 'Two rear-drive test cars tried it: no lap-time loss on either, but one touched the wall at a speed the standard setup passes.',
   },
   push: {
-    fwd: 'Two front-drive test cars tried it: faster laps on the short track; on Freemont faster for one car and no change for the other.',
+    fwd: 'Three front-drive test cars tried it: faster or equal laps on the short track, never slower; on Freemont (two of them) faster for one car and no change for the other.',
     awd: NOT_MEASURED,
     rwd: 'One rear-drive test car tried it: slower on Freemont.',
   },
