@@ -100,7 +100,7 @@ One line, for the stop the thumb is on and the car's drivetrain. Sources are the
 |---|---|---|---|
 | Front bites, full | Two front-drive test cars: faster at the same speed, but at the limit one lost 2.9 s a lap on one track, hit walls sooner and spun. | Not measured on an all-wheel-drive car. | Not measured on a rear-drive car. Half was already slower. |
 | Front bites, half | Three front-drive test cars: faster or the same over the same laps on short circuits. On Freemont faster for one, no change for another. | Not measured on an all-wheel-drive car. | One rear-drive test car: the rear slid much more and the lap was slower. |
-| As it is | The four rows stay as they are in your setup. | same | same |
+| As it is | Nothing is moved here: the car corners as your setup has it. | same | same |
 | Rear holds, half | Two front-drive test cars: the rear slid a little less, laps a little slower. | One all-wheel-drive test car: a little slower on the short circuit, no change on Freemont. | Two rear-drive test cars: the rear slid less at moderate speed, no lap gained or lost; one touched a wall at a speed the standard setup passes. |
 | Rear holds, full | Not measured on a front-drive car. | One all-wheel-drive test car on the test bench: the rear slid about a third less and the car turned less. No lap was driven. | Not measured on a rear-drive car. |
 
@@ -123,7 +123,7 @@ Folds, unchanged in content:
 
 Small lines under the block (replace the 50-word footnote):
 - "Changes keys on two screens below: Suspension and Tires & Brakes. Brake Bias is also moved by the Braking slider."
-- "Not kept: next time the Tuner's pick for your car comes back."
+- "Not kept: next time the Tuner's pick for your car comes back." (FWD on Circuit) / "Not kept: next time it is back in the middle." (all others)
 
 Cut: "Moves (↑ higher number, ↓ lower number): Front Springs ↑ ..." and "Now at 50 % of the way to the ends of this car's own ranges" (both go into "What it changes"; the stop name under the thumb already says "half"); "Both sliders use the same four rows in opposite directions, so only one can be on" (no longer needed); the Polish words in the labels ("tył ucieka", "przód nie skręca / pcha"): the page is English, the words were notes for the owner.
 

@@ -1,0 +1,76 @@
+<!doctype html>
+<!-- Static mock for docs/narada-handling-ui.md. Not the built page. Open with ?v=fwd (default) or ?v=rwd. -->
+<html lang="en"><head><meta charset="utf-8"><title>Cornering slider mock</title>
+<link rel="stylesheet" href="../../app.css">
+<style>
+  body { margin: 0; padding: 18px; width: 900px; background: #0d0d0d; color: #c4c4c4; font: 14px/1.45 system-ui, sans-serif; }
+  .mock-tag { font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: #8a8a8a; margin: 0 0 8px; }
+  .muted { color: #8a8a8a; }
+  .corner-help { margin: 8px 0 2px; color: #fff; font-size: 13px; }
+  .corner-row { display: grid; grid-template-columns: 150px 1fr 150px; gap: 12px; align-items: start; margin-top: 6px; }
+  .corner-end strong { display: block; color: #fff; font-size: 13px; }
+  .corner-end small { color: #8a8a8a; }
+  .corner-end.l { text-align: right; }
+  .corner-track input { width: 100%; margin: 0; accent-color: #c8f088; }
+  .corner-stops { display: flex; justify-content: space-between; margin: 2px -42px 0; font-size: 11px; color: #8a8a8a; text-align: center; }
+  .corner-stops span { flex: 0 0 100px; }
+  .corner-stops span.on { color: #fff; font-weight: 600; }
+  .corner-stops span.pick::after { content: "▲ Tuner's pick"; display: block; color: #c8f088; font-weight: 600; }
+  .corner-line { margin: 8px 0 4px; font-size: 13px; color: #c4c4c4; }
+  .corner-foot { display: flex; flex-wrap: wrap; gap: 4px 16px; align-items: baseline; margin-top: 6px; font-size: 12px; color: #8a8a8a; }
+  .corner-foot a { color: #c8f088; }
+  .tuner-badge.pick { border-color: #c8f088; color: #fff; }
+  .folds { display: flex; gap: 18px; }
+</style></head>
+<body>
+<p class="mock-tag" id="tag"></p>
+<div class="tuner-handling">
+  <p class="tuner-screen-head"><strong>Cornering</strong> <span class="tuner-badge" id="badge"></span></p>
+  <p class="muted" id="intro" style="margin:0;font-size:13px"></p>
+  <div class="tuner-feel">
+    <p class="corner-help">Front pushes wide? Move it left. Rear steps out? Move it right.</p>
+    <div class="corner-row">
+      <div class="corner-end l"><strong>Front bites more</strong><small>rear slides more</small></div>
+      <div class="corner-track">
+        <input type="range" min="-100" max="100" step="50" id="range" aria-label="Cornering: front bites more to rear holds more">
+        <div class="corner-stops" id="stops"><span>full</span><span>half</span><span>as it is</span><span>half</span><span>full</span></div>
+      </div>
+      <div class="corner-end"><strong>Rear holds more</strong><small>turns in less</small></div>
+    </div>
+    <p class="corner-line" id="line"></p>
+    <div class="folds">
+      <details class="tuner-why"><summary>What was measured</summary></details>
+      <details class="tuner-why"><summary>What it changes</summary></details>
+    </div>
+  </div>
+  <div class="corner-foot"><span>Changes keys on two screens below: Suspension and Tires &amp; Brakes. Brake Bias is also moved by the Braking slider.</span>
+    <span id="kept"></span></div>
+</div>
+<p class="mock-tag" style="margin-top:14px">For comparison: a slider of today's page (Suspension screen)</p>
+<div class="tuner-feel">
+  <label><strong>Steering</strong>
+    <span class="tuner-feel-row"><span>Slower</span><input type="range" min="-100" max="100" step="25" value="0"><span>Quicker</span></span></label>
+  <small>Same small turn of the wheel, how much the car turns (left end / right end): at 100 km/h 7 % less / 19 % more, ...</small>
+  <details class="tuner-why"><summary>What it changes</summary></details>
+</div>
+<script>
+  const cases = {
+    fwd: { tag: 'Mock · front-wheel-drive test car · Circuit tab', badge: "Tuner's pick", pick: 1, value: -50,
+      intro: 'Front-wheel drive: the Tuner already moved this halfway to "Front bites more". The front-drive test cars lapped faster or the same on short circuits with it.',
+      line: 'Three front-drive test cars: faster or the same over the same laps on short circuits. On Freemont faster for one, no change for another.',
+      kept: "Not kept: next time the Tuner's pick for your car comes back." },
+    rwd: { tag: 'Mock · rear-wheel-drive test car · Circuit tab', badge: 'Optional', pick: -1, value: 0,
+      intro: 'The Tuner leaves this in the middle. On the rear-drive and all-wheel-drive test cars neither side made laps faster. Move it only if the car bothers you.',
+      line: 'Nothing is moved here: the car corners as your setup has it.',
+      kept: 'Not kept: next time it is back in the middle.' },
+  };
+  const c = cases[new URLSearchParams(location.search).get('v')] || cases.fwd;
+  const $ = (id) => document.getElementById(id);
+  $('tag').textContent = c.tag; $('badge').textContent = c.badge; $('intro').textContent = c.intro;
+  if (c.pick >= 0) $('badge').classList.add('pick');
+  $('range').value = c.value; $('line').textContent = c.line; $('kept').textContent = c.kept;
+  const stops = $('stops').children;
+  stops[(c.value + 100) / 50].classList.add('on');
+  if (c.pick >= 0) stops[c.pick].classList.add('pick');
+</script>
+</body></html>
