@@ -130,6 +130,16 @@ export const FINDINGS: Record<'stable' | 'push', Finding[]> = {
       text: 'rear slides 31-36 % less in steady turns, 20 % less braking into a turn; but it turns 6-11 % less (15 % less braking into a turn)' },
     { car: '3000GT (AWD)', dose: '50 %', kind: 'lap', source: L('14.4, 16.2'),
       text: 'Freemont: no change (-0.03 s, inside the noise; rear slide 21.5-23.2° → 20.2°). Short circuit, same speed: +0.23 s over 2 laps (slower), the same on both layouts (the first one repeated to the frame)' },
+    { car: '3000GT (AWD)', dose: '75 %', kind: 'lap', source: L('14.3 round 3, 14.4'),
+      text: 'Freemont: -0.05 s (37.40 against 37.45 s, timed lap at each set\'s own limits; rear slide 19.5°)' },
+    { car: '3000GT (AWD)', dose: '100 %', kind: 'lap', source: L('14.3 round 3, 14.4'),
+      text: 'Freemont: no change (37.43 against 37.45 s, timed lap at each set\'s own limits; rear slide 21.5-23.2° → 18.9°)' },
+    { car: 'RX-8 (RWD)', dose: '25 %', kind: 'lap', source: L('14.3 round 3, 14.4'),
+      text: 'Freemont: 36.62 against 36.65 s, no change (one base run; rear slide 12.1°)' },
+    { car: 'RX-8 (RWD)', dose: '100 %', kind: 'lap', source: L('14.3, 14.4'),
+      text: 'Freemont: no gain (36.70 against 36.65 s, half: 36.55; one base run). The wall-corner limit one step lower (32 against 35). Rear slide 12.3° → 11.4°' },
+    { car: 'Peugeot 106 (FWD)', dose: '100 %', kind: 'lap', source: L('15.4'),
+      text: 'Freemont: +0.27 s over 2 laps at the same speed (slower). The limit in one corner one step lower (29 against 32). Rear slide 8.9° → 7.2°' },
     { car: 'RX-8 (RWD)', dose: '50 %', kind: 'drive', source: L('14.4'), text: 'Freemont: rear slide 12.3° → 11.7°' },
     { car: 'RX-8 (RWD)', dose: '50 %', kind: 'lap', source: L('14.4, 16.2'), text: 'Freemont: no change (-0.10 s, one run each). Short circuit, same speed: -0.05 s over 2 laps on one layout and 0.00 s on the other (each a wall touch for one lap); no loss anywhere' },
     { car: '350Z (RWD)', dose: '50 %', kind: 'drive', source: L('17.5'),
@@ -181,13 +191,15 @@ export const NOT_MEASURED = 'nie zmierzone';
 const KIND_WORDS: Record<FindingKind, string> = { drive: 'How it drives', lap: 'Lap time' };
 const DRIVE_OF_CAR: Record<Drivetrain, string> = { fwd: 'FWD', awd: 'AWD', rwd: 'RWD' };
 
+const DOSE_WORDS: Record<string, string> = { '25 %': 'quarter move', '50 %': 'half move', '75 %': 'three-quarter move', '100 %': 'full move' };
+
 /** The measured lines of one slider for a drivetrain: by kind; "nie zmierzone" when the drivetrain has none of that kind. */
 export function findingsFor(key: 'stable' | 'push', drive: Drivetrain): { kind: string; text: string; source: string }[] {
   const out: { kind: string; text: string; source: string }[] = [];
   for (const kind of ['drive', 'lap'] as FindingKind[]) {
     const own = FINDINGS[key].filter((f) => f.kind === kind && f.car.includes(`(${DRIVE_OF_CAR[drive]})`));
     if (!own.length) out.push({ kind: KIND_WORDS[kind], text: NOT_MEASURED, source: '' });
-    for (const f of own) out.push({ kind: KIND_WORDS[kind], text: `${f.car}, ${f.dose === '50 %' ? 'half move' : 'full move'}: ${f.text}.`, source: f.source });
+    for (const f of own) out.push({ kind: KIND_WORDS[kind], text: `${f.car}, ${DOSE_WORDS[f.dose] ?? f.dose}: ${f.text}.`, source: f.source });
   }
   return out;
 }

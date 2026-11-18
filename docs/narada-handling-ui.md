@@ -1,6 +1,7 @@
 # Narada: the "How the car drives in corners" block (2026-11-16)
 
 Design review only. No handling number, no dose and no `src/` file was changed. Branch `feat/tuner-3o`, read at f37b646.
+**Corrected 2026-11-18 (item 2 of `narada-tuner-whole.md` section 6).** Four statements below were wrong and are fixed in place: the "25 % and 75 % never driven" sentence (verdict condition and section 4), and the three "Rear holds, full" cells of 3.4 (FWD, RWD, AWD). Evidence: section 3.1 of `narada-tuner-whole.md`. Where this document says 5 stops (step 50), the whole-Tuner document wins: **9 stops, steps of 25 %, "Tuner's pick" only on a driven stop** (ranked item 4).
 Mockup: `docs/img/narada-handling-fwd-circuit.png`, `docs/img/narada-handling-rwd-circuit.png` (static HTML mock `docs/img/narada-handling-mock.html`, headless Brave; not the built page).
 
 Owner, verbatim: "opcja how the car drives in corners - jakoś mi to nie brzmi, i 2 suwaki które z tego co rozumiem korygują nad/pod sterowność - to nie powinien być jeden suwak czy się mylę? no ale jakieś te opcje są dziwne nie wiem... - może niech się fable wypowie o tym albo zrobi naradę".
@@ -13,7 +14,7 @@ Owner rules, verbatim: "pamiętaj że my nie tunujemy mojego samochodu tylko two
 - **Votes:** 4 for, 0 against, 2 conditional (Sceptic, Cost).
 - **Verdict: change it (poprawić).** The owner is right: it is one control. The code already treats it as one axis (`withHandling`: `axis = (h.stable - h.push) / 100`, the same four rows in opposite directions; the page switches one slider off when the other moves). Two sliders show two cures that do not exist.
 - **Roles that weigh most:** the User (the block must read in driving words at first sight) and the Sceptic (every stop of the slider must have a measurement or say that it has none).
-- **Condition:** the slider stops only where something was measured: 5 stops (full / half / as it is / half / full), not 9. The 25 % and 75 % stops were never driven on any car (laps `docs/laps.md` Step 20.3 "Not driven", `docs/handoff-post-audit.md` Open 2).
+- **Condition (corrected):** every stop says what was driven and what was not. ~~5 stops, because 25 % and 75 % were never driven~~ is wrong: 25 % and 75 % were driven on the "rear holds" side (3000GT 75 %, RX-8 25 %, Freemont, laps Step 14.3 round 3 and 14.4). Never driven on any car: the "front bites" side at 25 % and 75 %. So the slider has 9 stops (steps of 25 %); a stop between two driven ones says "between two driven setups; not driven itself".
 
 Answers to the five questions:
 
@@ -102,7 +103,7 @@ One line, for the stop the thumb is on and the car's drivetrain. Sources are the
 | Front bites, half | Three front-drive test cars: faster or the same over the same laps on short circuits. On Freemont faster for one, no change for another. | Not measured on an all-wheel-drive car. | One rear-drive test car: the rear slid much more and the lap was slower. |
 | As it is | Nothing is moved here: the car corners as your setup has it. | same | same |
 | Rear holds, half | Two front-drive test cars: the rear slid a little less, laps a little slower. | One all-wheel-drive test car: a little slower on the short circuit, no change on Freemont. | Two rear-drive test cars: the rear slid less at moderate speed, no lap gained or lost; one touched a wall at a speed the standard setup passes. |
-| Rear holds, full | Not measured on a front-drive car. | One all-wheel-drive test car on the test bench: the rear slid about a third less and the car turned less. No lap was driven. | Not measured on a rear-drive car. |
+| Rear holds, full | One front-drive test car (Freemont): slower at the same speed, one corner limit a step lower; the rear slid a little less. | One all-wheel-drive test car: no lap change on Freemont; the rear slid less (bench: about a third less, and the car turned less). | One rear-drive test car (Freemont): no lap gained, one corner limit a step lower; the rear slid a little less. |
 
 Evidence for each cell (all already in `FINDINGS`, `src/model/handling.ts`):
 
@@ -114,8 +115,14 @@ Evidence for each cell (all already in `FINDINGS`, `src/model/handling.ts`):
 | Rear holds, half, FWD | Peugeot 106: +0.05 s Freemont, +0.05 s / 2 laps short circuit. Civic Si: Freemont +0.22 s, rear slide 10.7 / 11.1° to 9.9 / 9.6° | laps Steps 17.2, 17.4 |
 | Rear holds, half, AWD | 3000GT: Freemont -0.03 s (inside the noise), short circuit +0.23 s / 2 laps on both layouts | laps Steps 14.4, 16.2 |
 | Rear holds, half, RWD | RX-8: Freemont -0.10 s (one run each), short circuit -0.05 and 0.00 s / 2 laps. 350Z: rear slide 20.2° to 15.9° and 17.8° to 13.7° at moderate speed, no change at its limit; Freemont -0.40 / -0.32 s (the factory set touches the wall there), short circuit -0.10 s / 2 laps with a wall touch in the last corner | laps Steps 14.4, 16.2, 17.4, 17.5 |
-| Rear holds, full, AWD | 3000GT bench: rear slides 31-36 % less in steady turns, turns 6-11 % less; no lap driven | `handling-design-r3l.md` 3m |
-| every other cell | nie zmierzone (not measured) | |
+| Rear holds, full, FWD | Peugeot 106, Freemont: +0.27 s over 2 same-speed laps (slower); corner limit 29 against 32 (one step lower); rear slide 8.9° to 7.2° | laps Step 15.4 |
+| Rear holds, full, RWD | RX-8, Freemont: timed lap 36.70 against 36.65 base (half 36.55); wall-corner limit 32 against 35; rear slide 12.3° to 11.4° (one base run) | laps Steps 14.3, 14.4 |
+| Rear holds, full, AWD | 3000GT, Freemont: timed lap 37.43 against 37.45 base (no change); rear slide 21.5-23.2° to 18.9°. Bench: rear slides 31-36 % less in steady turns, turns 6-11 % less | laps Steps 14.3 round 3, 14.4; `handling-design-r3l.md` 3m |
+| Rear holds, 75 %, AWD | 3000GT, Freemont: timed lap 37.40 against 37.45 base; rear slide 19.5° | laps Steps 14.3 round 3, 14.4 |
+| Rear holds, 25 %, RWD | RX-8, Freemont: timed lap 36.62 against 36.65 base; rear slide 12.1° | laps Steps 14.3 round 3, 14.4 |
+| every other cell | nie zmierzone (not measured). Never driven on any car: the "front bites" side at 25 % and 75 %. 3000GT 25 % was driven only before the judging fix (laps Step 13): not usable | |
+
+Limits of all "rear holds" laps: Freemont only; timed laps at each set's own limits, not same-speed laps; gains of 0.02-0.10 s, at or under the noise (0.02 s for the 3000GT; the RX-8 base is one run). The audit ruled that Step 14.4 gives no rule: read these cells as "no lap gained; the rear slides a little less; one car lost a step in one corner".
 
 Folds, unchanged in content:
 - **What was measured**: the `findingsFor` list of the car's drivetrain, now one list for the whole slider, grouped by stop.
@@ -132,7 +139,7 @@ Cut: "Moves (↑ higher number, ↓ lower number): Front Springs ↑ ..." and "N
 | Item | State |
 |---|---|
 | Stops with no measurement (5 of 12 cells) | Offered, with the line "Not measured on ...". The other choice is to cut the "front bites" side on all-wheel drive, where no stop was driven. Kept because the four rows move the same way on every car (`withHandling`), and the line says what is not known |
-| Step 50 instead of 25 | A UI choice, not a handling number: the dose stays 0.5. A player loses the 25 % and 75 % stops that have no measurement |
+| Step 50 instead of 25 | **Superseded:** 9 stops (step 25) is built. 25 % and 75 % exist as bytes and were driven on the rear side, so a player keeps the milder choice; the stops with no lap say so |
 | "faster or the same" wording for the FWD half stop | Golf level 1 lost 0.15 s on one lap and the sum of three laps was 0.00 s. "Never slower" in today's `PLAIN_LINES.push.fwd` is too strong for a single lap; the new line says "over the same laps" |
 
 ## 5. Place on the card, next to Steering, Braking, Nitrous

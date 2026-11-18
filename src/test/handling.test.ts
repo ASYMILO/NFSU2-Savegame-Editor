@@ -128,6 +128,12 @@ test('measured words: every number has a source, a drivetrain with no test says 
   assert.ok(lines('push', 'rwd').some((l) => /350Z/.test(l.text) && /\+0\.83/.test(l.text)));
   assert.ok(lines('push', 'fwd').some((l) => /-1\.42/.test(l.text)), 'the Civic\'s 4013 gain comes with its limit');
   assert.ok(lines('push', 'fwd').some((l) => /53\.9 s a lap against 51\.0 s/.test(l.text)));
+  // "rear holds, full" was driven on all three drivetrains on Freemont (laps Steps 14.3, 14.4, 15.4; narada-tuner-whole.md 3.1)
+  assert.ok(lines('stable', 'fwd').some((l) => /full move/.test(l.text) && /\+0\.27 s/.test(l.text) && /29 against 32/.test(l.text)));
+  assert.ok(lines('stable', 'rwd').some((l) => /full move/.test(l.text) && /36\.70 against 36\.65/.test(l.text)));
+  assert.ok(lines('stable', 'awd').some((l) => /full move/.test(l.text) && /37\.43 against 37\.45/.test(l.text)));
+  assert.ok(lines('stable', 'awd').some((l) => /three-quarter move/.test(l.text) && /37\.40/.test(l.text)));
+  assert.ok(lines('stable', 'rwd').some((l) => /quarter move/.test(l.text) && /36\.62/.test(l.text)));
   assert.match(handlingNote('awd', 0), /no default/);
   assert.match(handlingNote('fwd', 0), /50 %/);
   assert.match(handlingNote('fwd', 1), new RegExp(NOT_MEASURED));
