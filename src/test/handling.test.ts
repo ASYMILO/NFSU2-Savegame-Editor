@@ -173,6 +173,8 @@ test('measured words: every number has a source, a drivetrain with no test says 
   assert.ok(lines('stable', 'rwd').some((l) => /quarter move/.test(l.text) && /36\.62/.test(l.text)));
   assert.match(handlingNote('awd', 0), /leaves this in the middle/);
   assert.match(handlingNote('fwd', 0), /halfway/);
+  // item 6: the Circuit tab is also loaded by Sprint and career URL races (TAB_USES); say what was driven
+  assert.match(handlingNote('fwd', 0), /Sprint and career URL races: Sprint was never driven with it, and one URL track test showed no gain/);
   assert.match(handlingNote('fwd', 1), new RegExp(NOT_MEASURED));
 });
 

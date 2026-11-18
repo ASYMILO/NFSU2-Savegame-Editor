@@ -187,7 +187,9 @@ export const NOT_MEASURED = 'nie zmierzone';
 /** Two or three sentences above the Cornering slider: what Optimize did on this drivetrain and tab (final wording of narada-handling-ui.md 3.3). */
 export function handlingNote(drive: Drivetrain, tab: number): string {
   if (drive === 'fwd' && DOSE_TABS.includes(tab)) {
-    return 'Front-wheel drive: the Tuner already moved this halfway to "Front bites more". The front-drive test cars lapped faster or the same on short circuits with it.';
+    return 'Front-wheel drive: the Tuner already moved this halfway to "Front bites more". The front-drive test cars lapped faster or the same on short circuits with it. '
+      // item 6: TAB_USES (tuner.ts): career URL and Sprint load this tab; laps Step 20.3: one URL track, no gain
+      + 'This tab is also used by Sprint and career URL races: Sprint was never driven with it, and one URL track test showed no gain.';
   }
   if (drive === 'fwd' && tab === 4) {
     return 'Front-wheel drive: on URL the Tuner leaves this in the middle. One test car drove a URL track with the half move and gained nothing.';
