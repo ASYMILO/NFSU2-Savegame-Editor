@@ -355,6 +355,36 @@ export function handlingControl(model: DynoModel, setup: ArrayLike<number>, driv
   };
 }
 
+// ---- the grip / downforce check ---------------------------------------------------------------------------------------
+
+/** Tabs that get the check line: the lap tabs (Circuit, URL race). */
+export const CHECK_TABS = [0, 4];
+const CHECK_ROWS = [19, 20, 21, 22];
+
+/**
+ * Lines for tire grip and downforce rows that sit below the factory value (`factory`: what key C gives, startAfterC) in `setup`.
+ * Optimize never moves these rows, so a lower one was set by the player. The brief said "below the top of the range", but on the
+ * 3000GT with level-3 parts the factory downforce (5.36) is below the top (6.36): that would warn every player at the factory setting.
+ * The line says "Put it back to the factory value" and names the top. Evidence: downforce grows with speed and is not in the drag term, so lowering it buys
+ * no top speed; the Dyno does not use grip or downforce at all (code FUN_0059e620; tools repo docs/game-check-r3h.md B). Bench,
+ * test car 3000GT only: front grip or front downforce at the low end could not hold 200 km/h (r3h C). A row within half a key step
+ * of the factory value counts as equal (same rule as `room`).
+ */
+export function gripChecks(model: DynoModel, setup: ArrayLike<number>, factory: ArrayLike<number>): string[] {
+  const out: string[] = [];
+  for (const param of CHECK_ROWS) {
+    const info = rowInfo(model, setup, param);
+    if (!info) continue;
+    const { step } = rowScale(info);
+    if (rowShown(info, setup[param]) >= rowShown(info, factory[param]) - Math.max(1e-6, step / 2)) continue;
+    const name = ROW_LABELS[param][1], now = shownText(model, setup, param), fac = shownText(model, factory, param);
+    out.push(param >= 21
+      ? `Check: ${name} is below the factory value (now ${now}, factory ${fac}). Put it back to ${fac} or higher: lowering downforce gives no top speed (the game does not count it in the drag), and the car holds the road less at speed.`
+      : `Check: ${name} is below the factory value (now ${now}, factory ${fac}). Put it back to ${fac} or higher: top speed does not use tire grip, so lowering it gains nothing there. On the test car 3000GT a low front grip could not hold 200 km/h.`);
+  }
+  return out;
+}
+
 // ---- the advanced list -----------------------------------------------------------------------------------------------
 
 export interface AdvancedRow {

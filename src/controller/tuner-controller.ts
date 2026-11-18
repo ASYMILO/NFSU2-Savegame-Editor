@@ -15,7 +15,7 @@ import { gameNumbers, rollPull, type GameNumbers } from '../model/legal-opt.js';
 import { ROW_LABELS, ROW_ORDER, shownText } from '../model/hand-input.js';
 import { NitroScreen, rowInfo } from '../model/tune-keys.js';
 import { FEEL_SLIDERS, feelSliders, withFeel, type Feel } from '../model/feel.js';
-import { advancedRows, DRIVE_WORDS, driveShare, drivetrainOf, balanceOf, handlingControl, HANDLING_KEY, handlingOf, withHandling } from '../model/handling.js';
+import { advancedRows, CHECK_TABS, gripChecks, DRIVE_WORDS, driveShare, drivetrainOf, balanceOf, handlingControl, HANDLING_KEY, handlingOf, withHandling } from '../model/handling.js';
 import { clearPrefs, loadPrefs, savePrefs } from './browser-store.js';
 import {
   categoryScreens, gapWords, GOAL_WORDS, goalChoices, groupTabs, largestGap, legalOptions, lockedWhatIf, optimizeTab, planTab, PREFERENCES, saveWithTabs, SCREENS, screenPlans, SETUP_COUNT, startAfterC, stepCause,
@@ -538,6 +538,7 @@ function cards(src: Source, results: TabResult[], goals: Preference[], base: Uin
       presses: steps.reduce((n, s) => n + s.presses, 0),
       screens: screenPlans(src.model, group.map((x) => x.setup), steps, whatIf, feelScreens, causes).map((x) => ({ ...x, badge: BADGES[x.state], hasFeel: feelScreens.has(x.name) })),
       note: group.some((x) => x.setup === 1) ? 'In Drag races you shift by hand. The dyno shifts by itself.' : '',
+      checks: group.some((x) => CHECK_TABS.includes(x.setup)) ? gripChecks(src.model, layers.final, startAfterC(src.model)) : [],
       advanced: advancedRows(src.model, r.start, { base: base[r.setup], ...layers }),
       table,
       gap: gapWords({ ...diff, topKmh: Number(dtop.toFixed(1)) }, unit, pull, qm),

@@ -7,7 +7,7 @@ import { rowInfo, rowScale, setRowShown } from '../model/tune-keys.js';
 import { installedForLevels, withAero } from '../model/virtual-save.js';
 import { withFeel } from '../model/feel.js';
 import {
-  advancedRows, ANTI_PUSH_DOSE, DOSE_TABS, driveShare, drivetrainOf, FINDINGS, findingsFor, handlingControl, handlingDefault, handlingNote, handlingOf,
+  advancedRows, ANTI_PUSH_DOSE, DOSE_TABS, driveShare, drivetrainOf, FINDINGS, findingsFor, CHECK_TABS, gripChecks, handlingControl, handlingDefault, handlingNote, handlingOf,
   HANDLING_KEY, HANDLING_ROWS, isDriven, NOT_MEASURED, OWNER_WORDS, stopLine, withHandling, type Drivetrain,
 } from '../model/handling.js';
 
@@ -192,6 +192,18 @@ test('the Drag tab carries the quarter mile (the number it optimizes); no other 
   const q = at(1).plan.quarter;
   assert.ok(q && q.a! > 8 && q.a! < 30 && q.a === q.b && q.diff === 0, 'Drag');
   for (const k of [0, 2, 3, 4]) assert.equal(at(k).plan.quarter, null, `tab ${k}`);
+});
+
+test('grip / downforce check (item 8): a row below the factory value gets a line, the factory value gets none, only lap tabs', { skip: SKIP }, () => {
+  const m = modelOf('3000GT'), s = startAfterC(m);
+  assert.deepEqual(gripChecks(m, s, s), [], 'factory setting: no line');
+  const low = Uint8Array.from(s);
+  low[19] = Math.max(0, low[19] - 40); low[22] = Math.max(0, low[22] - 40);
+  const lines = gripChecks(m, low, s);
+  assert.equal(lines.length, 2);
+  assert.match(lines[0], /^Check: Front Grip is below the factory value \(now [\d.]+, factory [\d.]+\)\. Put it back to/);
+  assert.match(lines[1], /^Check: Rear Downforce .* gives no top speed/);
+  assert.deepEqual(CHECK_TABS, [0, 4]);
 });
 
 test('advanced list: every row the car has, with who changed it; keys reach the handling target within a byte', { skip: SKIP }, () => {

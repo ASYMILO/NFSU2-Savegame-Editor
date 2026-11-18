@@ -598,6 +598,7 @@ body {
 .corner-line strong::first-letter { text-transform: uppercase; }
 .corner-foot { display: flex; flex-wrap: wrap; gap: 4px 16px; align-items: baseline; margin: 6px 0 0; font-size: 12px; color: var(--color-text-muted); }
 .tuner-badge.pick { border-color: var(--color-green); color: var(--color-text-strong); }
+.tuner-gripcheck { margin: 8px 0; padding: 6px 10px; border-left: 4px solid var(--color-warning); font-size: 13px; color: var(--color-text); }
 .tuner-evidence-head { margin: 6px 0 0; font-size: 13px; }
 @media (max-width: 560px) { .corner-row { grid-template-columns: 1fr; } .corner-end.l { text-align: left; } .corner-track { order: -1; } }
 .tuner-evidence { margin: 4px 0 4px 18px; padding: 0; font-size: 13px; }

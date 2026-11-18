@@ -167,6 +167,7 @@
         </div>
         <p class="tuner-gap">Save-only setup compared with the keys' setup: <strong>{{ card.gap }}</strong>. Both are fair: inside the game's limits.</p>
         <p class="muted" ng-if="card.note">{{ card.note }}</p>
+        <p class="tuner-gripcheck" ng-repeat="c in card.checks track by $index">{{ c }}</p>
         <div class="editor-row" ng-if="tuner.canDownload">
           <button type="button" class="profile-action-btn tuner-go" ng-click="tunerDownload()" ng-disabled="tuner.stale || tuner.busy">{{ tuner.how === 'hand' ? 'Download save (same as the keys)' : 'Download save (best setup)' }}</button>
           <span class="muted">One copy with all 5 race types and your driving sliders.<span ng-if="tuner.how === 'hand'"> It holds exactly what the keys below give.</span> Load it in the game. Your loaded file is not changed. Keep your original backup.</span>

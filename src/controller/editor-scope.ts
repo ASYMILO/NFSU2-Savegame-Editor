@@ -249,6 +249,8 @@ export interface TunerCardView {
     steps: { screen: string; row: string; keys: string; shows: string; from?: string; presses: number; chart?: CurveChart; done?: boolean }[];
   }[];
   note: string;
+  /** Grip / downforce rows below the top of their range on a lap tab (handling.ts gripChecks), one line each. */
+  checks: string[];
   /** Every row of the car's tuning screens with its value, range and who changed it (folded under the card). */
   advanced: AdvancedRow[];
   table: HandRow[];
