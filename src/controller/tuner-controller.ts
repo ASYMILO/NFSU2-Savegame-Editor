@@ -513,6 +513,9 @@ function cards(src: Source, results: TabResult[], goals: Preference[], base: Uin
     const pull = r.plan.roll, nowPull = pull ? rollPull(src.model, r.start) : null;
     const secs = (v: number | null): string => (v === null ? '–' : `${v.toFixed(2)} s`);
     if (pull) table.push({ label: '50-120 mph pull', a: secs(pull.a), b: secs(pull.b), diff: sign(pull.diff, 's', 2), zero: pull.diff === null || Math.abs(pull.diff) < 0.005 });
+    // Drag: the number its goal is picked on ("the shortest quarter mile"), as the pull is for the lap tabs
+    const qm = r.plan.quarter;
+    if (qm) table.push({ label: 'Quarter mile', a: secs(qm.a), b: secs(qm.b), diff: sign(qm.diff, 's', 2), zero: qm.diff === null || Math.abs(qm.diff) < 0.005 });
     for (const row of table) if (row.zero) row.diff = 'same';
     return {
       setups: group.map((x) => x.setup),
@@ -525,6 +528,7 @@ function cards(src: Source, results: TabResult[], goals: Preference[], base: Uin
         { label: 'Top speed', now: top(now), after: top(a) },
         { label: 'Power', now: bhp(now.powerBhp), after: bhp(a.powerBhp) },
         ...(pull ? [{ label: '50-120 mph pull', now: secs(nowPull), after: secs(pull.a) }] : []),
+        ...(qm ? [{ label: 'Quarter mile', now: secs(now.quarter), after: secs(qm.a) }] : []),
       ],
       goal: GOAL_WORDS[legalOptions(goals[r.setup], r.setup).objective] ?? '',
       goals: goalChoices(r.setup),
@@ -534,7 +538,7 @@ function cards(src: Source, results: TabResult[], goals: Preference[], base: Uin
       note: group.some((x) => x.setup === 1) ? 'In Drag races you shift by hand. The dyno shifts by itself.' : '',
       advanced: advancedRows(src.model, r.start, { base: base[r.setup], ...layers }),
       table,
-      gap: gapWords({ ...diff, topKmh: Number(dtop.toFixed(1)) }, unit, pull),
+      gap: gapWords({ ...diff, topKmh: Number(dtop.toFixed(1)) }, unit, pull, qm),
       // only the by-hand list: the optimizer's own sheet has its own entry rules ("do not reset the Drivetrain"), which
       // differ from the steps above
       sheet: r.handSheet,

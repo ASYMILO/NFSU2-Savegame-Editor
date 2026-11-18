@@ -60,6 +60,11 @@ export interface HandInputPlan {
    * optimum (`b`) and their difference a - b. null on tabs whose objective is not the pull (Drag, Drift, Street X, top speed).
    */
   roll: { a: number | null; b: number | null; diff: number | null } | null;
+  /**
+   * The quarter mile in seconds (the number the Drag tab optimizes, objective weight 1.0) for the keys (`a`), the save-only
+   * optimum (`b`) and a - b. null on tabs whose objective does not lead with it (narada-tuner-whole.md P3, audit M6).
+   */
+  quarter: { a: number | null; b: number | null; diff: number | null } | null;
 }
 
 const MAX_PRESSES_PER_VISIT = 12;
@@ -403,6 +408,7 @@ export function planHandInput(model: DynoModel, saved: Uint8Array, optimum: Uint
   return {
     setup, plans, presses: plans.reduce((n, p) => n + p.presses, 0), a, b,
     diff: { t60: d(a.t60, b.t60), t100: d(a.t100, b.t100), topKmh: Math.round((a.topKmh - b.topKmh) * 10) / 10, powerBhp: Math.round((a.powerBhp - b.powerBhp) * 10) / 10 },
+    quarter: (OBJECTIVES[obj]?.w['quarter'] ?? 0) >= 1 ? { a: a.quarter, b: b.quarter, diff: d(a.quarter, b.quarter) } : null,
     roll: OBJECTIVES[obj]?.w['roll'] ? { a: rollPull(model, setup), b: rollPull(model, optimum), diff: d(rollPull(model, setup), rollPull(model, optimum)) } : null,
   };
 }

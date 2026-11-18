@@ -194,11 +194,15 @@ export function saveWithTabs(save: Uint8Array, slot: number, results: TabResult[
  * The best (save only) against the keys, in numbers: `diff` is keys minus best (hand-input.ts planHandInput), so a plus time
  * means the best is quicker. Below what the game's dyno screen shows (0.01 s, 0.1 km/h) counts as the same.
  * On a lap tab (`roll` given) the best is picked for the 50-120 mph pull, so that comes first and a 0-60 / 0-100 that goes the
- * other way is named as a launch figure, not left as "slower" next to the word best (audit M6, m8).
+ * other way is named as a launch figure, not left as "slower" next to the word best (audit M6, m8). On the Drag tab (`quarter`
+ * given) the quarter mile comes first.
  */
-export function gapWords(diff: HandInputPlan['diff'], unit = 'km/h', roll: HandInputPlan['roll'] = null): string {
+export function gapWords(diff: HandInputPlan['diff'], unit = 'km/h', roll: HandInputPlan['roll'] = null, quarter: HandInputPlan['quarter'] = null): string {
   const out: string[] = [];
   const time = (label: string, d: number | null): string | null => (d !== null && Math.abs(d) >= 0.005 ? `${label} ${Math.abs(d).toFixed(2)} s ${d > 0 ? 'quicker' : 'slower'}` : null);
+  // Drag: the quarter mile is the number the best is picked on, so it leads
+  const q = quarter ? time('quarter mile', quarter.diff) : null;
+  if (q) out.push(q);
   if (roll) {
     const pull = time('50-120 mph pull', roll.diff);
     if (pull) out.push(pull);
@@ -215,7 +219,8 @@ export function gapWords(diff: HandInputPlan['diff'], unit = 'km/h', roll: HandI
 export function largestGap(results: TabResult[]): string {
   let best: { d: number; text: string } | null = null;
   for (const r of results) {
-    const rows = r.plan.roll ? [['50-120 mph pull', r.plan.roll.diff]] as const : [['0-60', r.plan.diff.t60], ['0-100', r.plan.diff.t100]] as const;
+    const rows = r.plan.roll ? [['50-120 mph pull', r.plan.roll.diff]] as const
+      : r.plan.quarter ? [['quarter mile', r.plan.quarter.diff]] as const : [['0-60', r.plan.diff.t60], ['0-100', r.plan.diff.t100]] as const;
     for (const [label, d] of rows) {
       if (d !== null && d >= 0.005 && (!best || d > best.d)) best = { d, text: `${d.toFixed(2)} s quicker (${TAB_NAMES[r.setup]}, ${label})` };
     }

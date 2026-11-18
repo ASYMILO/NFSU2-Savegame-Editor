@@ -147,6 +147,14 @@ test('lap tabs carry the 50-120 mph pull (the number they optimize); Drag, Drift
   assert.equal(planTab(m, 4, start, start, 'top').plan.roll, null, 'the top-speed goal is not the pull');
 });
 
+test('the Drag tab carries the quarter mile (the number it optimizes); no other tab does (narada P3)', { skip: SKIP }, () => {
+  const m = modelOf('CIVIC'), start = startAfterC(m);
+  const at = (k: number): ReturnType<typeof planTab> => planTab(m, k, start, start, 'race');
+  const q = at(1).plan.quarter;
+  assert.ok(q && q.a! > 8 && q.a! < 30 && q.a === q.b && q.diff === 0, 'Drag');
+  for (const k of [0, 2, 3, 4]) assert.equal(at(k).plan.quarter, null, `tab ${k}`);
+});
+
 test('advanced list: every row the car has, with who changed it; keys reach the handling target within a byte', { skip: SKIP }, () => {
   const m = modelOf('PEUGOT106'), start = startAfterC(m);
   const felt = withFeel(m, start, start, {});
