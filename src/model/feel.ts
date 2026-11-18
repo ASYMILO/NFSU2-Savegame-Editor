@@ -58,14 +58,14 @@ export const FEEL_SLIDERS: FeelSlider[] = [
   { key: 'steering', screen: 'Suspension', label: 'Steering', low: 'Slower', high: 'Quicker', params: [8],
     basis: 'Moves Steering Ratio. The numbers are measured in the game with a 3000GT (how sharply the car turns, wheel held at 0.4 of full, '
       + 'flat road, two runs gave the same). With the wheel turned fully it changes nothing at 100, 150 and 200 km/h.',
-    when: `Same small turn of the wheel, how much the car turns (left end / right end): ${steeringWords()}. A full turn of the wheel: no change.` },
+    when: `Test car 3000GT. Same small turn of the wheel, how much the car turns (left end / right end): ${steeringWords()}. A full turn of the wheel: no change.` },
   // brakes FUN_005a4d80: front = 2·pedal·(1−B), rear = 2·pedal·B, B = this row (setup-bytes.md l.120-121). Measured (r3i C): full brake
   // from 100 / 150 / 200 km/h 20.81 / 23.04 / 27.75 m, 45.67 / 48.18 / 56.70 m, 80.16 / 82.73 / 92.60 m (lowest / saved / highest byte);
   // the car stopped within 1.6 degrees of straight every time; turning was not changed (r3h C).
   { key: 'brakes', screen: 'Tires & Brakes', label: 'Braking', low: 'Stops shorter', high: 'Stops longer', params: [18],
     basis: 'Moves Brake Bias: to the right, more brake force goes to the rear wheels. The numbers are measured in the game with a 3000GT '
       + '(full brake to a stop, flat road, two runs gave the same). The car stopped within 2 degrees of straight every time.',
-    when: `Full brake, the car stops in (left end / as set / right end): ${brakingWords()}. It stopped straight every time.` },
+    when: `Test car 3000GT. Full brake, the car stops in (left end / as set / right end): ${brakingWords()}. It stopped straight every time.` },
   // nitrous: one slider, longer = weaker (FUN_005b3100, l.58); seen in the game 2026-11-04 (setup-bytes.md "Confirmed in game":
   // a long and a very short setting were clearly visible in play)
   { key: 'nitrous', screen: 'Nitrous', label: 'Nitrous boost', low: 'Long, gentle', high: 'Short, strong', params: [16],

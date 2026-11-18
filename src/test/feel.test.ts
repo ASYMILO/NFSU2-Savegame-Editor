@@ -77,4 +77,6 @@ test('driving sliders: the card words are the game measurements at 100, 150 and 
   assert.match(steering, /at 100 km\/h 7 % less \/ 19 % more, at 150 km\/h 2 % less \/ 22 % more, at 200 km\/h 3 % less \/ 1 % more/);
   assert.match(braking, /from 100 km\/h 21 \/ 23 \/ 28 m, from 150 km\/h 46 \/ 48 \/ 57 m, from 200 km\/h 80 \/ 83 \/ 93 m/);
   for (const w of [steering, braking]) assert.ok(!/weaker|jargon|ratio|bias/i.test(w), w);
+  // item 7: one car's numbers say so in the visible line
+  for (const w of [steering, braking]) assert.match(w, /^Test car 3000GT\./);
 });
