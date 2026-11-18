@@ -18,7 +18,7 @@ import { FEEL_SLIDERS, feelSliders, withFeel, type Feel } from '../model/feel.js
 import { advancedRows, CHECK_TABS, gripChecks, DRIVE_WORDS, driveShare, drivetrainOf, balanceOf, handlingControl, HANDLING_KEY, handlingOf, withHandling } from '../model/handling.js';
 import { clearPrefs, loadPrefs, savePrefs } from './browser-store.js';
 import {
-  categoryScreens, gapWords, GOAL_WORDS, goalChoices, groupTabs, largestGap, legalOptions, lockedWhatIf, optimizeTab, planTab, PREFERENCES, saveWithTabs, SCREENS, screenPlans, SETUP_COUNT, startAfterC, stepCause,
+  cardNote, categoryScreens, gapWords, GOAL_WORDS, goalChoices, groupTabs, largestGap, legalOptions, lockedWhatIf, optimizeTab, planTab, PREFERENCES, saveWithTabs, SCREENS, screenPlans, SETUP_COUNT, startAfterC, stepCause,
   TAB_NAMES, TAB_USES, TUNED, tunerSteps, type Preference, type TabResult,
 } from '../model/tuner.js';
 import { curveChart } from './editor-controller.js';
@@ -537,7 +537,7 @@ function cards(src: Source, results: TabResult[], goals: Preference[], base: Uin
       goalKey: goals[r.setup],
       presses: steps.reduce((n, s) => n + s.presses, 0),
       screens: screenPlans(src.model, group.map((x) => x.setup), steps, whatIf, feelScreens, causes).map((x) => ({ ...x, badge: BADGES[x.state], hasFeel: feelScreens.has(x.name) })),
-      note: group.some((x) => x.setup === 1) ? 'In Drag races you shift by hand. The dyno shifts by itself.' : '',
+      note: cardNote(group.map((x) => x.setup)),
       checks: group.some((x) => CHECK_TABS.includes(x.setup)) ? gripChecks(src.model, layers.final, startAfterC(src.model)) : [],
       advanced: advancedRows(src.model, r.start, { base: base[r.setup], ...layers }),
       table,

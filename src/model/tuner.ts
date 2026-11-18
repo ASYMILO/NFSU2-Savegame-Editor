@@ -228,6 +228,18 @@ export function largestGap(results: TabResult[]): string {
   return best?.text ?? '';
 }
 
+/**
+ * The note under a card's table. Drag: the dyno shifts by itself, a Drag race does not (audit M7). Drift and Street X: the Tuner
+ * sets the engine only; the race itself changes grip (race-type presets, FUN_005b4dc0, tuner repo docs/setup-bytes.md B), so no
+ * lap or bench result from a circuit carries over (narada-tuner-whole.md item 9).
+ */
+export function cardNote(setups: number[]): string {
+  const out: string[] = [];
+  if (setups.includes(1)) out.push('In Drag races you shift by hand. The dyno shifts by itself.');
+  if (setups.some((k) => k === 2 || k === 3)) out.push('Engine only. Handling is not measured for this race, and the race changes grip itself.');
+  return out.join(' ');
+}
+
 /** Tabs whose start, keys and result are the same share one card. */
 export function groupTabs(results: TabResult[]): TabResult[][] {
   const groups = new Map<string, TabResult[]>();

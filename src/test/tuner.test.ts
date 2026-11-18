@@ -6,7 +6,7 @@ import { defaultSetup } from '../model/legal-opt.js';
 import type { SliderPlan } from '../model/hand-input.js';
 import { CurveScreen, NitroScreen, openRow, pressFinalDrive, pressRowState, resetRow, rowInfo } from '../model/tune-keys.js';
 import {
-  categoryScreens, curveKeys, gapWords, goalChoices, groupTabs, legalOptions, menuOrder, planTab, RESET, saveWithTabs, SCREEN_ORDER, screenPlans, startAfterC, stepCause, tunerSteps, unlockParts, type TabResult, type TunerStep,
+  cardNote, categoryScreens, curveKeys, gapWords, goalChoices, groupTabs, legalOptions, menuOrder, planTab, RESET, saveWithTabs, SCREEN_ORDER, screenPlans, startAfterC, stepCause, tunerSteps, unlockParts, type TabResult, type TunerStep,
 } from '../model/tuner.js';
 import { PERF_PARTS } from '../data/perf-parts.js';
 import { buildVirtualSave, installedForLevels, withAero } from '../model/virtual-save.js';
@@ -185,6 +185,12 @@ test('steps of a screen Optimize does not tune name their cause: the Cornering m
   const plans = screenPlans(model, [0], steps, {}, new Set(), { Suspension: stepCause(true, false) });
   assert.equal(plans.find((p) => p.name === 'Suspension')!.text, 'From the Cornering setting above.');
   assert.equal(plans.find((p) => p.name === 'Tires & Brakes')!.text, 'From your sliders below.');
+});
+
+test('card note: Drag shifts by hand, Drift and Street X are engine only (item 9), the lap tabs have none', () => {
+  assert.equal(cardNote([0, 4]), '');
+  assert.equal(cardNote([1]), 'In Drag races you shift by hand. The dyno shifts by itself.');
+  for (const k of [2, 3]) assert.match(cardNote([k]), /^Engine only\. Handling is not measured for this race, and the race changes grip itself\.$/);
 });
 
 test('aero levels set one front bumper and one spoiler flag', () => {
