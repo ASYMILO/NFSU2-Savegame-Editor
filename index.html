@@ -123,7 +123,7 @@
       <p class="muted" ng-if="tuner.source !== 'save'">You get the keys to press in the game. To get a changed save, open the Tuner from a car slot of your save.</p>
       <div class="editor-row">
         <button type="button" class="profile-action-btn tuner-go" ng-click="tunerOptimize()" ng-disabled="tuner.busy">{{ tuner.busy ? 'Working…' : 'Find best setup' }}</button>
-        <span class="muted" ng-if="!tuner.busy">Works out ECU, Turbo and Drivetrain for all 5 race types at once. On a front-wheel-drive car it also moves four suspension and brake rows on Circuit and URL (you can switch that off below the result).</span>
+        <span class="muted" ng-if="!tuner.busy">Works out ECU, Turbo and Drivetrain for all 5 race types at once. On a front-wheel-drive car it also moves four suspension and brake rows on the Circuit tab (that tab is also used by Sprint and career URL races); you can change that below the result.</span>
       </div>
       <div class="tuner-progress" ng-if="tuner.busy" role="status">
         <progress max="5" value="{{ tuner.done }}"></progress>
@@ -188,7 +188,7 @@
             </details>
             <details class="tuner-why"><summary>What it changes</summary><small class="muted">{{ h.basis }}</small></details>
           </div>
-          <p class="muted"><small>Both sliders use the same four rows in opposite directions, so only one can be on. Brake Bias is also moved by the Braking slider above. The slider positions are not kept: next time the default for your car comes back. Test cars only; nobody measured every car.</small></p>
+          <p class="muted"><small>Both sliders use the same four rows in opposite directions, so only one can be on. Brake Bias is also moved by the Braking slider below. The slider positions are not kept: next time the default for your car comes back. Test cars only; nobody measured every car.</small></p>
         </div>
         <details class="hand-older tuner-advanced">
           <summary>Advanced: every row ({{ card.advanced.length }}) with its value, range and what changed it</summary>

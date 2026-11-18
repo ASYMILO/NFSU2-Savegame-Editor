@@ -327,6 +327,16 @@ export function tunerSteps(model: DynoModel, r: TabResult, fromC: boolean): Tune
   return steps;
 }
 
+/**
+ * Why a screen that Optimize does not tune has steps: the Cornering move (written above the screens; on a front-wheel-drive
+ * Circuit card Optimize makes it itself), the driving sliders on the screen, or both. The player must not be told he moved a
+ * slider he did not touch (narada-tuner-whole.md P2).
+ */
+export function stepCause(cornering: boolean, sliders: boolean): string {
+  if (cornering && sliders) return 'From the Cornering setting above and your sliders below.';
+  return cornering ? 'From the Cornering setting above.' : 'From your sliders below.';
+}
+
 /** One screen of the game's menu on a card: what to do there, or why there is nothing to do. */
 export interface ScreenPlan {
   name: string;
@@ -349,13 +359,15 @@ export const TUNED = new Set(['Drivetrain', 'ECU', 'Turbo']);
  * Every screen of the menu in the game's order, with the steps of `steps` under their screen (`setups`: the card's tabs).
  * @param whatIf Extra line for a locked screen (the dyno with the part that opens it), by screen name.
  * @param feel Screens that have a driving slider for this card (feel.ts feelSliders); they are shown on the screen's block.
+ * @param causes Who made the steps of a screen that Optimize does not tune, by screen name ({@link stepCause}); a screen not
+ *   named here says "your sliders".
  */
 export function screenPlans(model: DynoModel, setups: number[], steps: TunerStep[], whatIf: Record<string, string> = {},
-  feel: ReadonlySet<string> = new Set()): ScreenPlan[] {
+  feel: ReadonlySet<string> = new Set(), causes: Record<string, string> = {}): ScreenPlan[] {
   return SCREENS.map(({ name, params }) => {
     const own = steps.filter((s) => s.screen === name);
     const tuned = TUNED.has(name);
-    if (own.length) return { name, state: 'set', text: tuned ? '' : 'From your sliders below.', steps: own };
+    if (own.length) return { name, state: 'set', text: tuned ? '' : (causes[name] ?? stepCause(false, true)), steps: own };
     if (!params.some((p) => model.tuningRecords.has(p))) {
       const then = tuned ? 'Then the Tuner sets it.' : 'The Tuner does not set it.';
       return { name, state: 'locked', text: `Buy ${unlockParts(model.game, params).join(' or ')} to open it. ${then}${whatIf[name] ? ` ${whatIf[name]}` : ''}`, steps: [] };

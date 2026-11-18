@@ -18,7 +18,7 @@ import { FEEL_SLIDERS, feelSliders, withFeel, type Feel } from '../model/feel.js
 import { advancedRows, DRIVE_WORDS, driveShare, drivetrainOf, handlingNote, handlingOf, handlingSliders, HANDLING_KEYS, withHandling } from '../model/handling.js';
 import { clearPrefs, loadPrefs, savePrefs } from './browser-store.js';
 import {
-  categoryScreens, gapWords, GOAL_WORDS, goalChoices, groupTabs, largestGap, legalOptions, lockedWhatIf, optimizeTab, planTab, PREFERENCES, saveWithTabs, SCREENS, screenPlans, SETUP_COUNT, startAfterC,
+  categoryScreens, gapWords, GOAL_WORDS, goalChoices, groupTabs, largestGap, legalOptions, lockedWhatIf, optimizeTab, planTab, PREFERENCES, saveWithTabs, SCREENS, screenPlans, SETUP_COUNT, startAfterC, stepCause,
   TAB_NAMES, TAB_USES, TUNED, tunerSteps, type Preference, type TabResult,
 } from '../model/tuner.js';
 import { curveChart } from './editor-controller.js';
@@ -491,6 +491,11 @@ function cards(src: Source, results: TabResult[], goals: Preference[], base: Uin
   return groupTabs(results).map((group): TunerCardView => {
     const r = group[0], { a, b, diff } = r.plan;
     const feelScreens = new Set(feelSliders(src.model, src.starts[r.setup], group.map((x) => x.setup)).map((f) => f.screen));
+    const layers = layersOf(src.model, r.start, base[r.setup], feels[r.setup] ?? {}, r.setup);
+    // who moved the rows of each screen Optimize does not tune: the Cornering move (felt -> final) and/or a driving slider (base -> felt)
+    const moved = (a: ArrayLike<number>, b: ArrayLike<number>, params: number[]): boolean => params.some((p) => a[p] !== b[p]);
+    const causes: Record<string, string> = {};
+    for (const scr of SCREENS) causes[scr.name] = stepCause(moved(layers.felt, layers.final, scr.params), moved(base[r.setup], layers.felt, scr.params));
     const names = group.map((x) => TAB_NAMES[x.setup]);
     const now = gameNumbers(src.model.evaluate(r.start));
     const steps = tunerSteps(src.model, r, src.fromC).map((s) => (s.curve && s.passes?.length
@@ -525,9 +530,9 @@ function cards(src: Source, results: TabResult[], goals: Preference[], base: Uin
       goals: goalChoices(r.setup),
       goalKey: goals[r.setup],
       presses: steps.reduce((n, s) => n + s.presses, 0),
-      screens: screenPlans(src.model, group.map((x) => x.setup), steps, whatIf, feelScreens).map((x) => ({ ...x, badge: BADGES[x.state], hasFeel: feelScreens.has(x.name) })),
+      screens: screenPlans(src.model, group.map((x) => x.setup), steps, whatIf, feelScreens, causes).map((x) => ({ ...x, badge: BADGES[x.state], hasFeel: feelScreens.has(x.name) })),
       note: group.some((x) => x.setup === 1) ? 'In Drag races you shift by hand. The dyno shifts by itself.' : '',
-      advanced: advancedRows(src.model, r.start, { base: base[r.setup], ...layersOf(src.model, r.start, base[r.setup], feels[r.setup] ?? {}, r.setup) }),
+      advanced: advancedRows(src.model, r.start, { base: base[r.setup], ...layers }),
       table,
       gap: gapWords({ ...diff, topKmh: Number(dtop.toFixed(1)) }, unit, pull),
       // only the by-hand list: the optimizer's own sheet has its own entry rules ("do not reset the Drivetrain"), which

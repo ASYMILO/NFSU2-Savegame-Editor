@@ -6,7 +6,7 @@ import { defaultSetup } from '../model/legal-opt.js';
 import type { SliderPlan } from '../model/hand-input.js';
 import { CurveScreen, NitroScreen, openRow, pressFinalDrive, pressRowState, resetRow, rowInfo } from '../model/tune-keys.js';
 import {
-  categoryScreens, curveKeys, gapWords, goalChoices, groupTabs, legalOptions, menuOrder, planTab, RESET, saveWithTabs, SCREEN_ORDER, screenPlans, startAfterC, tunerSteps, unlockParts, type TabResult,
+  categoryScreens, curveKeys, gapWords, goalChoices, groupTabs, legalOptions, menuOrder, planTab, RESET, saveWithTabs, SCREEN_ORDER, screenPlans, startAfterC, stepCause, tunerSteps, unlockParts, type TabResult, type TunerStep,
 } from '../model/tuner.js';
 import { PERF_PARTS } from '../data/perf-parts.js';
 import { buildVirtualSave, installedForLevels, withAero } from '../model/virtual-save.js';
@@ -173,6 +173,18 @@ test('a card lists every screen in menu order; screens without a part are locked
   for (const name of ['Suspension', 'Drivetrain', 'Aerodynamics', 'Tires & Brakes', 'Turbo', 'Nitrous']) {
     assert.equal(plans.find((p) => p.name === name)!.state, 'locked', name);
   }
+});
+
+test('steps of a screen Optimize does not tune name their cause: the Cornering move, the sliders, or both', { skip: SKIP }, () => {
+  assert.equal(stepCause(false, true), 'From your sliders below.');
+  assert.equal(stepCause(true, false), 'From the Cornering setting above.');
+  assert.equal(stepCause(true, true), 'From the Cornering setting above and your sliders below.');
+  const game = parseGameData(new Uint8Array(readFileSync(GAME_BUN)));
+  const model = new DynoModel(game, game.cars.find((c) => c.name === '3000GT')!, installedForLevels({}), new Array(9).fill(0));
+  const steps = [{ screen: 'Suspension' }, { screen: 'Tires & Brakes' }] as TunerStep[];
+  const plans = screenPlans(model, [0], steps, {}, new Set(), { Suspension: stepCause(true, false) });
+  assert.equal(plans.find((p) => p.name === 'Suspension')!.text, 'From the Cornering setting above.');
+  assert.equal(plans.find((p) => p.name === 'Tires & Brakes')!.text, 'From your sliders below.');
 });
 
 test('aero levels set one front bumper and one spoiler flag', () => {
