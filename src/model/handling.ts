@@ -1,7 +1,7 @@
 /**
  * Handling of the Tuner (round 3o): the car's drivetrain from the game data, the four rows that steer how the rear and the
- * front hold (front springs, front sway bar, rear sway bar, brake bias), the default Optimize writes for them, two "symptom"
- * sliders, what was measured for each, and the advanced list of every row.
+ * front hold (front springs, front sway bar, rear sway bar, brake bias), the default Optimize writes for them, one two-sided
+ * "Cornering" slider with nine stops (steps of 25 %), what was measured at each stop, and the advanced list of every row.
  *
  * Why these rows and these ends: laps repo docs/laps.md Steps 14-17 (lap tests on five test cars, see {@link FINDINGS}) and
  * docs/handling-design-r3l.md section 3m of this repo (bench tests). Nothing here is a model of the game: every number shown
@@ -61,9 +61,15 @@ export const ANTI_PUSH_DOSE = 0.5;
  */
 export const DOSE_TABS = [0];
 
-/** Slider positions, 0..100 each; they use the same four rows in opposite directions, so only one is above 0. */
+/** Positions of the four rows, 0..100 each; they use the same rows in opposite directions, so only one is above 0. */
 export interface Handling { stable: number; push: number }
-export const HANDLING_KEYS = { stable: 'handlingStable', push: 'handlingPush' } as const;
+/** The one page slider: -100 (front bites, `push`) .. 0 (as it is) .. +100 (rear holds, `stable`), steps of {@link STOP_STEP}. */
+export const HANDLING_KEY = 'handlingBalance';
+export const STOP_STEP = 25;
+
+/** The slider value of a position pair, and back. */
+export const balanceOf = (h: Handling): number => h.stable - h.push;
+export const handlingFromBalance = (b: number): Handling => (b > 0 ? { stable: b, push: 0 } : { stable: 0, push: Math.abs(b) });
 
 /**
  * What Optimize writes for the four rows, as slider positions. RWD and AWD: nothing (three cars, three of three lost time on the
@@ -73,20 +79,20 @@ export function handlingDefault(drive: Drivetrain, setup: number): Handling {
   return { stable: 0, push: drive === 'fwd' && DOSE_TABS.includes(setup) ? Math.round(ANTI_PUSH_DOSE * 100) : 0 };
 }
 
-/** Positions from a tab's slider record (missing = the default of the car's drivetrain on that tab). */
+/** Position from a tab's slider record (missing = the default of the car's drivetrain on that tab), on the grid of stops. */
 export function handlingOf(feel: Record<string, number>, drive: Drivetrain, setup: number): Handling {
-  const d = handlingDefault(drive, setup);
-  const pick = (v: number | undefined, dflt: number): number => (typeof v === 'number' ? Math.max(0, Math.min(100, v)) : dflt);
-  const stable = pick(feel[HANDLING_KEYS.stable], d.stable), push = pick(feel[HANDLING_KEYS.push], d.push);
-  // both above 0 cannot happen from the page (the second one resets the first); if stored so, the stable one wins
-  return stable > 0 ? { stable, push: 0 } : { stable: 0, push };
+  const v = feel[HANDLING_KEY];
+  if (typeof v !== 'number' || !Number.isFinite(v)) return handlingDefault(drive, setup);
+  return handlingFromBalance(Math.round(Math.max(-100, Math.min(100, v)) / STOP_STEP) * STOP_STEP);
 }
 
-/** Is there room for a row to move toward the stable (+1) or the anti-push (-1) end? (a row already at that end cannot) */
+/** Is there room for a row to move toward the stable (+1) or the anti-push (-1) end? (a row already at, or within half a step of, that end cannot) */
 function room(model: DynoModel, setup: ArrayLike<number>, row: { param: number; stable: 1 | -1 }, dir: 1 | -1): boolean {
   const info = rowInfo(model, setup, row.param);
   if (!info) return false;
-  const { min, max } = rowScale(info), now = rowShown(info, setup[row.param]), eps = 1e-6;
+  // a row within half a key step of its end has no room: the byte grid may not reach the end exactly (Peugeot 106 front springs
+  // after a full move show 0.04 against a box end of 0; one more push gives the same byte)
+  const { min, max, step } = rowScale(info), now = rowShown(info, setup[row.param]), eps = Math.max(1e-6, step / 2);
   return row.stable * dir > 0 ? now < max - eps : now > min + eps;
 }
 
@@ -169,24 +175,26 @@ export const FINDINGS: Record<'stable' | 'push', Finding[]> = {
   ],
 };
 
-/** One sentence above the sliders: what Optimize did with the four rows on this drivetrain and tab, and why. */
+/**
+ * The words a player may or may not get in the owner's language, kept in one place: the owner has not yet said whether Polish
+ * words stay on the English page (narada-tuner-whole.md item 16). Swap or empty these three; nothing else holds Polish text.
+ */
+export const OWNER_WORDS = { frontPushes: ' (przód nie skręca / pcha)', rearSteps: ' (tył ucieka)' } as const;
+
+/** The words for something nobody measured. Never a guess. (Owner's word, see {@link OWNER_WORDS}.) */
+export const NOT_MEASURED = 'nie zmierzone';
+
+/** Two or three sentences above the Cornering slider: what Optimize did on this drivetrain and tab (final wording of narada-handling-ui.md 3.3). */
 export function handlingNote(drive: Drivetrain, tab: number): string {
   if (drive === 'fwd' && DOSE_TABS.includes(tab)) {
-    return `Front-wheel drive: Optimize moved the four rows ${Math.round(ANTI_PUSH_DOSE * 100)} % of the way toward the "front bites" ends. `
-      + 'At the same speed the full move gains about 2 to 3 times more (Civic short circuit: -2.42 s against -1.25 s on one layout, -1.42 s against -0.53 s over 2 laps on the other). '
-      + 'At the car\'s limit half never lost more than 0.5 s, the full move lost 2.9 s. So half is the default; the slider shows where it stands.';
+    return 'Front-wheel drive: the Tuner already moved this halfway to "Front bites more". The front-drive test cars lapped faster or the same on short circuits with it.';
   }
   if (drive === 'fwd' && tab === 4) {
-    return 'Front-wheel drive: on URL Optimize leaves the four rows as they are. One test car (Civic Si, half move) drove a URL track: '
-      + 'no gain at the same speed (-0.08 s over 2 laps, +0.18 s over 5 laps). Move the slider if the front pushes wide.';
+    return 'Front-wheel drive: on URL the Tuner leaves this in the middle. One test car drove a URL track with the half move and gained nothing.';
   }
-  if (drive === 'fwd') return `Front-wheel drive: on this race type Optimize leaves the four rows as they are. Nobody drove this race type with them moved (${NOT_MEASURED}).`;
-  return 'Optimize leaves the four rows as they are. On the three rear-drive and all-wheel-drive test cars the "rear holds" ends gave no steady gain at the same speed: '
-    + 'nothing measurable on one track, a small loss for the all-wheel-drive car on the other, and a wall touch for the 350Z. So there is no default. Move the slider if the rear steps out.';
+  if (drive === 'fwd') return `Front-wheel drive: on this race type the Tuner leaves this in the middle. Nobody drove this race type with it moved (${NOT_MEASURED}).`;
+  return 'The Tuner leaves this in the middle. On the rear-drive and all-wheel-drive test cars no step gave a clear lap gain. Move it only if the car bothers you.';
 }
-
-/** The words for something nobody measured. Never a guess. */
-export const NOT_MEASURED = 'nie zmierzone';
 
 const KIND_WORDS: Record<FindingKind, string> = { drive: 'How it drives', lap: 'Lap time' };
 const DRIVE_OF_CAR: Record<Drivetrain, string> = { fwd: 'FWD', awd: 'AWD', rwd: 'RWD' };
@@ -204,70 +212,145 @@ export function findingsFor(key: 'stable' | 'push', drive: Drivetrain): { kind: 
   return out;
 }
 
-// ---- the two sliders -------------------------------------------------------------------------------------------------
+// ---- the Cornering slider ---------------------------------------------------------------------------------------------
 
-export interface HandlingSlider {
-  key: string;
-  which: 'stable' | 'push';
-  /** Driving words, with the owner's wording in brackets. */
+/** One stop of the slider: where the thumb sits, its name, and the one line shown under the slider while the thumb is on it. */
+export interface CornerStop {
+  value: number;
+  /** Short name under the track. */
   label: string;
-  low: string;
-  high: string;
-  /** What it moves, in the game's row names. */
-  rows: string;
-  /** One plain sentence on what was measured; the numbers are folded under "What was measured". */
+  /** Long name inside the lines ("half, front bites"). */
+  name: string;
+  /** Was a lap or a bench test run at exactly this stop on this kind of car? */
+  driven: boolean;
+  /** Share of the track (0..100) where the thumb sits, for the label row of the stops that are offered. */
+  at: number;
+  /** Offered: inside the range this car's parts leave room for. */
+  offered: boolean;
   line: string;
-  findings: { kind: string; text: string; source: string }[];
-  /** Where the evidence comes from, and what is not known (shown folded). */
-  basis: string;
-  /** The position Optimize starts it at for this car and tab. */
-  start: number;
-  /** The slider has room to move only if a row can go that way. */
-  min: 0;
-  max: 100;
 }
 
-/** One plain sentence per slider and drivetrain (what the lines in {@link FINDINGS} say, no numbers; audit m7). */
-export const PLAIN_LINES: Record<'stable' | 'push', Record<Drivetrain, string>> = {
-  stable: {
-    fwd: 'Two front-drive test cars tried it: no gain, a little slower (on Freemont for both, on the short track for one).',
-    awd: 'One all-wheel-drive test car tried it: a little slower on the short track, no change on Freemont.',
-    rwd: 'Two rear-drive test cars tried it: no lap-time loss on either, but one touched the wall at a speed the standard setup passes.',
+export interface HandlingControl {
+  key: string;
+  intro: string;
+  /** The help line with the player's two symptoms and the way to move. */
+  help: string;
+  leftEnd: string; leftNote: string; rightEnd: string; rightNote: string;
+  /** All nine stops, -100..100. */
+  stops: CornerStop[];
+  /** The range this car's parts leave room for (-100..100 if both sides have room). */
+  min: number; max: number;
+  /** Where Optimize starts the thumb for this car and tab, and the stop that carries the "Tuner's pick" mark (null = none). */
+  start: number;
+  pick: number | null;
+  /** "This car's parts leave no room to the left / right." or ''. */
+  noRoom: string;
+  /** What was measured, by side. */
+  measured: { title: string; findings: { kind: string; text: string; source: string }[] }[];
+  /** What it changes (folded). */
+  basis: string;
+}
+
+const CAR_WORDS: Record<Drivetrain, string> = { fwd: 'front-drive', awd: 'all-wheel-drive', rwd: 'rear-drive' };
+const STOP_LABELS: Record<number, string> = { 0: 'as it is', 25: '¼', 50: 'half', 75: '¾', 100: 'full' };
+const STOP_WORDS: Record<number, string> = { 25: 'a quarter', 50: 'half', 75: 'three quarters', 100: 'full' };
+
+/** The stop's name in a sentence: "half, front bites", "as it is". */
+export function stopName(value: number): string {
+  return value === 0 ? 'as it is' : `${STOP_WORDS[Math.abs(value)]}, ${value < 0 ? 'front bites' : 'rear holds'}`;
+}
+
+/**
+ * The stops that were driven (laps or bench) on each drivetrain, with what was measured there, in plain words (numbers are in
+ * {@link FINDINGS}, folded under "What was measured"). Everything else is "not driven itself". Evidence per cell: laps repo
+ * docs/laps.md Steps 14.3, 14.4 (3000GT, RX-8), 15.4 (Peugeot 106), 17.2-17.5 (Civic Si, 350Z), 18.3, 20.3, 21.2 (Golf), and
+ * handling-design-r3l.md 3m (bench). Corrected 2026-11-18, narada-tuner-whole.md 3.1: 25 % and 75 % were driven on the rear side.
+ * Front-wheel drive: front bites 50 / 100 %, rear holds 50 / 100 %. All-wheel drive (3000GT): rear holds 50 / 75 / 100 %. Rear-wheel
+ * drive (RX-8, 350Z): front bites 50 %, rear holds 25 / 50 / 100 %. The 3000GT at 25 % was driven only before the judging fix (Step 13).
+ */
+const DRIVEN: Record<Drivetrain, Record<number, string>> = {
+  fwd: {
+    [-100]: 'Two front-drive test cars: faster at the same speed, but at the limit one lost 2.9 s a lap on one track, hit walls sooner and spun.',
+    [-50]: 'Three front-drive test cars: faster or the same over the same laps on short circuits. On Freemont faster for one, no change for another.',
+    50: 'Two front-drive test cars: the rear slid a little less, laps a little slower.',
+    100: 'One front-drive test car (Freemont): slower at the same speed, one corner limit a step lower; the rear slid a little less.',
   },
-  push: {
-    fwd: 'Three front-drive test cars tried it: faster or equal laps on the short track, never slower; on Freemont (two of them) faster for one car and no change for the other.',
-    awd: NOT_MEASURED,
-    rwd: 'One rear-drive test car tried it: slower on Freemont.',
+  awd: {
+    50: 'One all-wheel-drive test car: a little slower on the short circuit, no change on Freemont.',
+    75: 'One all-wheel-drive test car (Freemont only): a lap 0.05 s faster, the rear slid less.',
+    100: 'One all-wheel-drive test car: no lap change on Freemont; the rear slid less (on the test bench about a third less, and the car turned less).',
+  },
+  rwd: {
+    [-50]: 'One rear-drive test car: the rear slid much more and the lap was slower.',
+    25: 'One rear-drive test car (Freemont): no lap change; the rear slid a little less.',
+    50: 'Two rear-drive test cars: the rear slid less at moderate speed, no lap gained or lost; one touched a wall at a speed the standard setup passes.',
+    100: 'One rear-drive test car (Freemont): no lap gained, one corner limit a step lower; the rear slid a little less.',
   },
 };
 
-// Code behind the rows (kept out of the UI): springs FUN_005a3700, brakes FUN_005a4d80; the anti-roll (sway bar) term of the game was not found.
-const BASIS = 'Moves front springs, front bar, rear bar and brake balance, each toward the end of this car\'s own range. '
-  + 'The effects were measured in the game (lap tests and bench tests with five test cars), not computed. The sway bars\' effect rests on those measurements alone.';
+/** Was this stop driven on this drivetrain? ("as it is" always is: nothing moves.) */
+export const isDriven = (drive: Drivetrain, value: number): boolean => value === 0 || value in DRIVEN[drive];
 
 /**
- * The symptom sliders a car and tab can use. A slider is offered when at least one of the four rows has room toward its ends;
- * none when the parts open none of the four rows. Slider positions are not kept between cars (they depend on the drivetrain).
+ * The one line under the slider for a stop and drivetrain: its own result if it was driven, else "not driven itself" with the
+ * nearest driven stop on that side (the farther-out one when two are equally near, so a stop next to a risky one carries its
+ * warning), and "between two driven setups" when both neighbours were driven. Never a number that was not measured.
  */
-export function handlingSliders(model: DynoModel, setup: ArrayLike<number>, drive: Drivetrain, tab: number): HandlingSlider[] {
-  const d = handlingDefault(drive, tab);
+export function stopLine(drive: Drivetrain, value: number): string {
+  if (value === 0) return 'Nothing is moved here: the car corners as your setup has it.';
+  const own = DRIVEN[drive][value];
+  if (own) return own;
+  const side = Math.sign(value), driven = (v: number): boolean => Math.abs(v) <= 100 && isDriven(drive, v);
+  const between = driven(value - STOP_STEP) && driven(value + STOP_STEP);
+  let near: number | null = null;
+  for (let d = STOP_STEP; d <= 100 && near === null; d += STOP_STEP) {
+    for (const v of [value + side * d, value - side * d].sort((x, y) => Math.abs(y) - Math.abs(x))) {
+      if (Math.sign(v) === side && Math.abs(v) <= 100 && v in DRIVEN[drive]) { near = v; break; }
+    }
+  }
+  const head = between ? 'Between two driven setups; not driven itself.' : 'Not driven itself.';
+  return near === null ? `${head} No step on this side was driven on a ${CAR_WORDS[drive]} car.` : `${head} Nearest driven (${stopName(near)}): ${DRIVEN[drive][near]}`;
+}
+
+const NO_ROOM = (side: string): string => `This car's parts leave no room to the ${side}.`;
+
+// Code behind the rows (kept out of the UI): springs FUN_005a3700, brakes FUN_005a4d80; the anti-roll (sway bar) term of the game was not found.
+const BASIS = 'Moves Front Springs, Front Sway Bar, Rear Sway Bar and Brake Bias, each toward the end of this car\'s own range. '
+  + 'Left: springs and front bar softer, rear bar stiffer, brakes toward the rear. Right: the opposite. '
+  + 'Measured in the game with test cars (lap tests and bench tests), not computed; the sway bars\' effect rests on those measurements alone. Test cars only; nobody measured every car.';
+
+/**
+ * The Cornering slider a car and tab can use, or null when the parts open none of the four rows. One side is not offered when no
+ * row can move toward it (`room`): the slider then runs from the middle to the other end only. The position is not a number
+ * of ours: every stop names what was driven and what was not.
+ */
+export function handlingControl(model: DynoModel, setup: ArrayLike<number>, drive: Drivetrain, tab: number): HandlingControl | null {
   const rows = HANDLING_ROWS.filter((r) => rowInfo(model, setup, r.param));
-  if (!rows.length) return [];
-  const names = (dir: 1 | -1): string => rows.map((r) => `${ROW_LABELS[r.param][1]} ${r.stable * dir > 0 ? '↑' : '↓'}`).join(', ');
-  const out: HandlingSlider[] = [];
-  if (rows.some((r) => room(model, setup, r, 1))) {
-    out.push({
-      key: HANDLING_KEYS.stable, which: 'stable', label: 'The rear steps out in corners (tył ucieka)', low: 'As it is', high: 'Rear holds more',
-      rows: names(1), line: PLAIN_LINES.stable[drive], findings: findingsFor('stable', drive), basis: BASIS, start: d.stable, min: 0, max: 100,
+  const left = rows.some((r) => room(model, setup, r, -1)), right = rows.some((r) => room(model, setup, r, 1));
+  if (!left && !right) return null;
+  const min = left ? -100 : 0, max = right ? 100 : 0;
+  const dflt = balanceOf(handlingDefault(drive, tab)), start = Math.max(min, Math.min(max, dflt));
+  const stops: CornerStop[] = [];
+  for (let value = -100; value <= 100; value += STOP_STEP) {
+    stops.push({
+      value, label: STOP_LABELS[Math.abs(value)], name: stopName(value), driven: isDriven(drive, value), offered: value >= min && value <= max,
+      at: (value - min) / (max - min) * 100, line: stopLine(drive, value),
     });
   }
-  if (rows.some((r) => room(model, setup, r, -1))) {
-    out.push({
-      key: HANDLING_KEYS.push, which: 'push', label: 'The front does not turn in, it pushes wide (przód nie skręca / pcha)', low: 'As it is', high: 'Front bites more',
-      rows: names(-1), line: PLAIN_LINES.push[drive], findings: findingsFor('push', drive), basis: BASIS, start: d.push, min: 0, max: 100,
-    });
-  }
-  return out;
+  return {
+    key: HANDLING_KEY, intro: handlingNote(drive, tab),
+    help: `Front pushes wide${OWNER_WORDS.frontPushes}? Move it left. Rear steps out${OWNER_WORDS.rearSteps}? Move it right.`,
+    leftEnd: 'Front bites more', leftNote: '(rear slides more)', rightEnd: 'Rear holds more', rightNote: '(turns in less)',
+    stops, min, max, start,
+    // the mark sits on the Tuner's own move, only if that stop was driven (nothing is called "the pick" without a lap behind it)
+    pick: dflt !== 0 && start === dflt && isDriven(drive, dflt) ? dflt : null,
+    noRoom: !left ? NO_ROOM('left') : !right ? NO_ROOM('right') : '',
+    measured: [
+      { title: 'Front bites more', findings: findingsFor('push', drive) },
+      { title: 'Rear holds more', findings: findingsFor('stable', drive) },
+    ],
+    basis: BASIS,
+  };
 }
 
 // ---- the advanced list -----------------------------------------------------------------------------------------------

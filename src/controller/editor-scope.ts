@@ -5,7 +5,7 @@ import type { PerfPart, UniquePerfPart } from '../data/perf-parts.js';
 import type { CurveKind, DynoEvent, ScalarCategory, ScalarRow } from '../model/dyno.js';
 import type { ColorPalette } from '../model/visual.js';
 import type { CareerReport } from '../model/career.js';
-import type { AdvancedRow, HandlingSlider } from '../model/handling.js';
+import type { AdvancedRow, HandlingControl } from '../model/handling.js';
 
 /** Result of a donor-list or file-load problem, shown in the status line. */
 export interface Status {
@@ -313,10 +313,8 @@ export interface TunerView {
   /** Slider positions of the card on show (-100..100, 0 = as now), and the sliders it can use. */
   feel: Record<string, number>;
   sliders: TunerFeelView[];
-  /** The two handling sliders of the card on show (positions are in `feel` under their keys), empty when the parts open none of their rows. */
-  handling: HandlingSlider[];
-  /** What Optimize did with the handling rows for this car and tab. */
-  handlingNote: string;
+  /** The Cornering slider of the card on show (its position is in `feel` under `handling.key`); null when the parts open none of its rows. */
+  handling: HandlingControl | null;
 }
 
 /** Top-level tuning tab. */
@@ -454,8 +452,9 @@ export interface EditorScope extends angular.IScope {
   tunerHow(): void;
   /** km/h or mph changed (kept in this browser). */
   tunerUnits(): void;
-  /** @param changed the key of the slider that moved (the two handling sliders switch each other off). */
-  tunerFeel(changed?: string): void;
+  tunerFeel(): void;
+  /** Put the Cornering slider back to where Optimize started it for this car and tab. */
+  tunerCornerReset(): void;
   tunerTab(card: number): void;
   tunerDownload(): void;
   tunerLogo(): string;

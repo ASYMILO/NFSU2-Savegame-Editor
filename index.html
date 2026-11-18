@@ -171,24 +171,39 @@
           <button type="button" class="profile-action-btn tuner-go" ng-click="tunerDownload()" ng-disabled="tuner.stale || tuner.busy">{{ tuner.how === 'hand' ? 'Download save (same as the keys)' : 'Download save (best setup)' }}</button>
           <span class="muted">One copy with all 5 race types and your driving sliders.<span ng-if="tuner.how === 'hand'"> It holds exactly what the keys below give.</span> Load it in the game. Your loaded file is not changed. Keep your original backup.</span>
         </div>
-        <div class="tuner-handling" ng-if="tuner.handling.length">
-          <p class="tuner-screen-head"><strong>How the car drives in corners</strong> <span class="tuner-badge">Optional</span></p>
-          <p class="muted">{{ tuner.handlingNote }}</p>
-          <div class="tuner-feel" ng-repeat="h in tuner.handling track by h.key">
-            <label><strong>{{ h.label }}</strong>
-              <span class="tuner-feel-row"><span>{{ h.low }}</span>
-                <input type="range" ng-attr-min="{{ h.min }}" ng-attr-max="{{ h.max }}" step="25" ng-model="tuner.feel[h.key]" ng-model-options="{ updateOn: 'change' }" ng-change="tunerFeel(h.key)" ng-disabled="tuner.busy" aria-label="{{ h.label }}: {{ h.low }} to {{ h.high }}">
-                <span>{{ h.high }}</span></span></label>
-            <small>Moves (↑ higher number, ↓ lower number): {{ h.rows }}. Now at {{ tuner.feel[h.key] || 0 }} % of the way to the ends of this car's own ranges.</small>
-            <p class="muted tuner-line"><small ng-class="{ muted: h.line === 'nie zmierzone' }">{{ h.line }}</small></p>
+        <div class="tuner-handling" ng-if="tuner.handling" ng-init="h = tuner.handling">
+          <p class="tuner-screen-head"><strong>Cornering</strong>
+            <span class="tuner-badge" ng-class="{ pick: tuner.feel[h.key] === h.pick }">{{ tuner.feel[h.key] === h.pick ? "Tuner's pick" : 'Optional' }}</span></p>
+          <p class="muted">{{ h.intro }}</p>
+          <div class="tuner-feel">
+            <p class="corner-help">{{ h.help }}</p>
+            <div class="corner-row">
+              <div class="corner-end l"><strong>{{ h.leftEnd }}</strong><small>{{ h.leftNote }}</small></div>
+              <div class="corner-track">
+                <input type="range" ng-attr-min="{{ h.min }}" ng-attr-max="{{ h.max }}" step="25" ng-model="tuner.feel[h.key]" ng-model-options="{ updateOn: 'change' }" ng-change="tunerFeel()" ng-disabled="tuner.busy"
+                       aria-label="Cornering: {{ h.leftEnd }} to {{ h.rightEnd }}">
+                <div class="corner-stops">
+                  <span ng-repeat="st in h.stops track by st.value" ng-if="st.offered" ng-class="{ on: st.value === tuner.feel[h.key], pick: st.value === h.pick, between: !st.driven }"
+                        ng-style="{ left: 'calc(8px + (100% - 16px) * ' + (st.at / 100) + ')' }">{{ st.label }}<em ng-if="st.value === h.pick">▲ Tuner's pick</em></span>
+                </div>
+              </div>
+              <div class="corner-end"><strong>{{ h.rightEnd }}</strong><small>{{ h.rightNote }}</small></div>
+            </div>
+            <p class="corner-line"><strong>{{ (h.stops[(tuner.feel[h.key] + 100) / 25] || h.stops[4]).name }}.</strong> {{ (h.stops[(tuner.feel[h.key] + 100) / 25] || h.stops[4]).line }}</p>
+            <p class="muted corner-line" ng-if="h.noRoom"><small>{{ h.noRoom }}</small></p>
             <details class="tuner-why"><summary>What was measured</summary>
-              <ul class="tuner-evidence">
-                <li ng-repeat="f in h.findings track by $index"><strong>{{ f.kind }}:</strong> <span ng-class="{ muted: f.text === 'nie zmierzone' }">{{ f.text }}</span></li>
-              </ul>
+              <div ng-repeat="g in h.measured track by g.title">
+                <p class="tuner-evidence-head"><strong>{{ g.title }}</strong></p>
+                <ul class="tuner-evidence">
+                  <li ng-repeat="f in g.findings track by $index"><strong>{{ f.kind }}:</strong> <span ng-class="{ muted: f.text === 'nie zmierzone' }">{{ f.text }}</span></li>
+                </ul>
+              </div>
             </details>
             <details class="tuner-why"><summary>What it changes</summary><small class="muted">{{ h.basis }}</small></details>
           </div>
-          <p class="muted"><small>Both sliders use the same four rows in opposite directions, so only one can be on. Brake Bias is also moved by the Braking slider below. The slider positions are not kept: next time the default for your car comes back. Test cars only; nobody measured every car.</small></p>
+          <p class="corner-foot"><span>Changes keys on two screens below: Suspension and Tires &amp; Brakes. Brake Bias is also moved by the Braking slider below.</span>
+            <span>Not kept: next time {{ h.start === 0 ? 'it is back in the middle' : "the Tuner's pick for your car comes back" }}.</span>
+            <button type="button" class="link-btn" ng-if="tuner.feel[h.key] !== h.start" ng-click="tunerCornerReset()" ng-disabled="tuner.busy">{{ h.start === 0 ? 'Back to as it is' : (h.pick !== null ? "Back to the Tuner's pick" : "Back to where the Tuner put it") }}</button></p>
         </div>
         <details class="hand-older tuner-advanced">
           <summary>Advanced: every row ({{ card.advanced.length }}) with its value, range and what changed it</summary>

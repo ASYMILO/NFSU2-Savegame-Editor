@@ -7,8 +7,8 @@ import { rowInfo, rowScale, setRowShown } from '../model/tune-keys.js';
 import { installedForLevels, withAero } from '../model/virtual-save.js';
 import { withFeel } from '../model/feel.js';
 import {
-  advancedRows, ANTI_PUSH_DOSE, DOSE_TABS, driveShare, drivetrainOf, FINDINGS, findingsFor, handlingDefault, handlingNote, handlingOf, handlingSliders,
-  HANDLING_KEYS, HANDLING_ROWS, NOT_MEASURED, withHandling, type Drivetrain,
+  advancedRows, ANTI_PUSH_DOSE, DOSE_TABS, driveShare, drivetrainOf, FINDINGS, findingsFor, handlingControl, handlingDefault, handlingNote, handlingOf,
+  HANDLING_KEY, HANDLING_ROWS, isDriven, NOT_MEASURED, OWNER_WORDS, stopLine, withHandling, type Drivetrain,
 } from '../model/handling.js';
 
 const GAME_BUN = process.env.NFSU2_GLOBALB ?? 'C:/Program Files (x86)/EA GAMES/Need for Speed Underground 2/GLOBAL/GLOBALB.BUN';
@@ -51,13 +51,14 @@ test('default dose: none on rear-drive and all-wheel-drive, ANTI_PUSH_DOSE on th
   assert.ok(ANTI_PUSH_DOSE > 0 && ANTI_PUSH_DOSE <= 1);
 });
 
-test('slider record: missing = the default, an explicit 0 beats the default, both above 0 keeps the stable one, values clamp', () => {
+test('slider record: missing = the default, an explicit 0 beats the default, values clamp and snap to the nine stops', () => {
   assert.deepEqual(handlingOf({}, 'fwd', 0), { stable: 0, push: 50 });
-  assert.deepEqual(handlingOf({ [HANDLING_KEYS.push]: 0 }, 'fwd', 0), { stable: 0, push: 0 });
+  assert.deepEqual(handlingOf({ [HANDLING_KEY]: 0 }, 'fwd', 0), { stable: 0, push: 0 });
   assert.deepEqual(handlingOf({}, 'rwd', 0), { stable: 0, push: 0 });
-  assert.deepEqual(handlingOf({ [HANDLING_KEYS.stable]: 75 }, 'fwd', 0), { stable: 75, push: 0 });
-  assert.deepEqual(handlingOf({ [HANDLING_KEYS.stable]: 50, [HANDLING_KEYS.push]: 50 }, 'awd', 0), { stable: 50, push: 0 });
-  assert.deepEqual(handlingOf({ [HANDLING_KEYS.push]: 900 }, 'awd', 0), { stable: 0, push: 100 });
+  assert.deepEqual(handlingOf({ [HANDLING_KEY]: 75 }, 'fwd', 0), { stable: 75, push: 0 });
+  assert.deepEqual(handlingOf({ [HANDLING_KEY]: -75 }, 'awd', 0), { stable: 0, push: 75 });
+  assert.deepEqual(handlingOf({ [HANDLING_KEY]: -900 }, 'awd', 0), { stable: 0, push: 100 });
+  assert.deepEqual(handlingOf({ [HANDLING_KEY]: 30 }, 'awd', 0), { stable: 25, push: 0 });
 });
 
 test('handling rows: stable ends = stiff front springs / front bar, soft rear bar, brake to the front; anti-push the reverse; each to the car\'s own box', { skip: SKIP }, () => {
@@ -93,21 +94,57 @@ test('the dose: 50 % lands halfway between the saved value and the car\'s anti-p
   assert.deepEqual(withHandling(m, moved, { stable: 0, push: 100 }), moved, 'rows at their ends stay');
 });
 
-test('sliders: offered with room, closed without the parts, no hidden default on rear-drive', { skip: SKIP }, () => {
+test('Cornering: one slider, nine stops, offered with room, closed without the parts, no hidden default on rear-drive', { skip: SKIP }, () => {
   const awd = modelOf('3000GT'), s = startAfterC(awd);
-  const sliders = handlingSliders(awd, s, 'awd', 0);
-  assert.deepEqual(sliders.map((x) => x.key), [HANDLING_KEYS.stable, HANDLING_KEYS.push]);
-  assert.ok(sliders.every((x) => x.start === 0 && x.rows.includes('Brake Bias')));
+  const c = handlingControl(awd, s, 'awd', 0)!;
+  assert.equal(c.key, HANDLING_KEY);
+  assert.deepEqual(c.stops.map((x) => x.value), [-100, -75, -50, -25, 0, 25, 50, 75, 100]);
+  assert.ok(c.start === 0 && c.pick === null && c.min === -100 && c.max === 100 && c.noRoom === '' && c.stops.every((x) => x.offered));
+  assert.ok(c.basis.includes('Brake Bias'));
   const fwd = modelOf('PEUGOT106'), f = startAfterC(fwd);
-  assert.deepEqual(handlingSliders(fwd, f, 'fwd', 0).map((x) => x.start), [0, 50]);
-  assert.deepEqual(handlingSliders(fwd, f, 'fwd', 1).map((x) => x.start), [0, 0], 'Drag: no default');
-  // the stable slider closes when every row is already at its stable end
+  const fc = handlingControl(fwd, f, 'fwd', 0)!;
+  assert.deepEqual([fc.start, fc.pick], [-50, -50], 'Circuit: the Tuner\'s pick sits on a driven stop');
+  assert.deepEqual(handlingControl(fwd, f, 'fwd', 1)!.start, 0, 'Drag: no default');
+  assert.equal(handlingControl(fwd, f, 'fwd', 1)!.pick, null);
+  // a side with no room is not offered: the slider runs from the middle to the other end, and a line says so
   const stable = withHandling(fwd, f, { stable: 100, push: 0 });
-  assert.deepEqual(handlingSliders(fwd, stable, 'fwd', 0).map((x) => x.which), ['push']);
+  const right = handlingControl(fwd, stable, 'fwd', 0)!;
+  assert.deepEqual([right.min, right.max, right.start, right.pick], [-100, 0, -50, -50]);
+  assert.equal(right.noRoom, "This car's parts leave no room to the right.");
+  assert.deepEqual(right.stops.filter((x) => x.offered).map((x) => x.value), [-100, -75, -50, -25, 0]);
+  const pushed = withHandling(fwd, f, { stable: 0, push: 100 });
+  const left = handlingControl(fwd, pushed, 'fwd', 0)!;
+  assert.deepEqual([left.min, left.max, left.start, left.pick], [0, 100, 0, null], 'the default cannot go where there is no room');
+  assert.equal(left.noRoom, "This car's parts leave no room to the left.");
   // no suspension or brake parts: nothing to move
   const bare = modelOf('3000GT', { EC: 2, TU: 2, TR: 2 }), b = startAfterC(bare);
-  assert.deepEqual(handlingSliders(bare, b, 'awd', 0), []);
+  assert.equal(handlingControl(bare, b, 'awd', 0), null);
   assert.deepEqual(withHandling(bare, b, { stable: 100, push: 0 }), b);
+});
+
+test('every stop has one line: driven stops say what was driven, the others say "not driven itself" with their nearest driven stop (narada 3o items 2 and 4)', () => {
+  const driven = (d: Drivetrain): number[] => [-100, -75, -50, -25, 0, 25, 50, 75, 100].filter((v) => isDriven(d, v));
+  // the corrected evidence table: 25 / 75 % were driven on the rear side (3000GT 75 %, RX-8 25 %); never on the front side
+  assert.deepEqual(driven('fwd'), [-100, -50, 0, 50, 100]);
+  assert.deepEqual(driven('awd'), [0, 50, 75, 100]);
+  assert.deepEqual(driven('rwd'), [-50, 0, 25, 50, 100]);
+  for (const d of ['fwd', 'awd', 'rwd'] as Drivetrain[]) for (let v = -100; v <= 100; v += 25) {
+    const line = stopLine(d, v);
+    assert.ok(line.length > 10 && !/undefined|NaN/.test(line), `${d} ${v}`);
+    assert.equal(/^(Between two driven setups; )?[Nn]ot driven itself/.test(line), !isDriven(d, v), `${d} ${v}: ${line}`);
+  }
+  // "three quarters, front bites" on a front-drive car sits between two driven setups and carries the full stop's warning
+  assert.match(stopLine('fwd', -75), /^Between two driven setups; not driven itself\. Nearest driven \(full, front bites\): .*spun/);
+  assert.match(stopLine('fwd', -25), /^Between two driven setups.*\(half, front bites\)/);
+  assert.match(stopLine('awd', -50), /No step on this side was driven on a all-wheel-drive car|No step on this side was driven on an? /);
+  assert.match(stopLine('rwd', -100), /^Not driven itself\. Nearest driven \(half, front bites\)/);
+  assert.match(stopLine('rwd', 75), /^Between two driven setups.*\(full, rear holds\)/);
+});
+
+test('the owner\'s Polish words stay in one place (OWNER_WORDS, NOT_MEASURED) until the owner answers (narada-tuner-whole.md item 16)', { skip: SKIP }, () => {
+  const m = modelOf('3000GT'), c = handlingControl(m, startAfterC(m), 'awd', 0)!;
+  assert.equal(c.help, `Front pushes wide${OWNER_WORDS.frontPushes}? Move it left. Rear steps out${OWNER_WORDS.rearSteps}? Move it right.`);
+  assert.deepEqual([OWNER_WORDS.frontPushes, OWNER_WORDS.rearSteps, NOT_MEASURED], [' (przód nie skręca / pcha)', ' (tył ucieka)', 'nie zmierzone']);
 });
 
 test('measured words: every number has a source, a drivetrain with no test says "nie zmierzone", nothing is filled in', () => {
@@ -134,8 +171,8 @@ test('measured words: every number has a source, a drivetrain with no test says 
   assert.ok(lines('stable', 'awd').some((l) => /full move/.test(l.text) && /37\.43 against 37\.45/.test(l.text)));
   assert.ok(lines('stable', 'awd').some((l) => /three-quarter move/.test(l.text) && /37\.40/.test(l.text)));
   assert.ok(lines('stable', 'rwd').some((l) => /quarter move/.test(l.text) && /36\.62/.test(l.text)));
-  assert.match(handlingNote('awd', 0), /no default/);
-  assert.match(handlingNote('fwd', 0), /50 %/);
+  assert.match(handlingNote('awd', 0), /leaves this in the middle/);
+  assert.match(handlingNote('fwd', 0), /halfway/);
   assert.match(handlingNote('fwd', 1), new RegExp(NOT_MEASURED));
 });
 

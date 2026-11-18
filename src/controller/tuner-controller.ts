@@ -15,7 +15,7 @@ import { gameNumbers, rollPull, type GameNumbers } from '../model/legal-opt.js';
 import { ROW_LABELS, ROW_ORDER, shownText } from '../model/hand-input.js';
 import { NitroScreen, rowInfo } from '../model/tune-keys.js';
 import { FEEL_SLIDERS, feelSliders, withFeel, type Feel } from '../model/feel.js';
-import { advancedRows, DRIVE_WORDS, driveShare, drivetrainOf, handlingNote, handlingOf, handlingSliders, HANDLING_KEYS, withHandling } from '../model/handling.js';
+import { advancedRows, DRIVE_WORDS, driveShare, drivetrainOf, balanceOf, handlingControl, HANDLING_KEY, handlingOf, withHandling } from '../model/handling.js';
 import { clearPrefs, loadPrefs, savePrefs } from './browser-store.js';
 import {
   categoryScreens, gapWords, GOAL_WORDS, goalChoices, groupTabs, largestGap, legalOptions, lockedWhatIf, optimizeTab, planTab, PREFERENCES, saveWithTabs, SCREENS, screenPlans, SETUP_COUNT, startAfterC, stepCause,
@@ -67,7 +67,7 @@ export function attachTuner($scope: EditorScope, api: TunerApi): () => void {
       })),
     ],
     now: null, busy: false, progress: '', done: 0, seconds: 0, error: '', stale: false, carName: '', fromC: true,
-    canDownload: false, gap: '', units: 'kmh', cards: [], tabs: [], card: 0, feel: {}, sliders: [], handling: [], handlingNote: '',
+    canDownload: false, gap: '', units: 'kmh', cards: [], tabs: [], card: 0, feel: {}, sliders: [], handling: null,
   };
   const t = $scope.tuner;
   /** Optimize's result per tab (engine rows), the slider positions per tab, and the plans made from both. */
@@ -144,7 +144,7 @@ export function attachTuner($scope: EditorScope, api: TunerApi): () => void {
     results = [];
     base = [];
     if (dropFeel) feels = kept().feels;
-    t.cards = []; t.tabs = []; t.card = 0; t.stale = false; t.sliders = []; t.handling = []; t.handlingNote = ''; t.feel = {}; t.gap = '';
+    t.cards = []; t.tabs = []; t.card = 0; t.stale = false; t.sliders = []; t.handling = null; t.feel = {}; t.gap = '';
   }
 
   /** The chosen car, or why there is none yet ('' = nothing chosen). */
@@ -277,21 +277,23 @@ export function attachTuner($scope: EditorScope, api: TunerApi): () => void {
     t.feel = feels[first];
     t.sliders = feelSliders(src.model, src.starts[first], view.setups)
       .map(({ key, screen, label, low, high, basis, when, min, max, limit }) => ({ key, screen, label, low, high, basis, when, min, max, limit }));
-    // handling: the positions Optimize used for this car and tab (the default on a front-wheel-drive car), then the sliders
-    const drive = drivetrainOf(driveShare(src.model)), h = handlingOf(t.feel, drive, first);
-    t.feel[HANDLING_KEYS.stable] = h.stable;
-    t.feel[HANDLING_KEYS.push] = h.push;
-    t.handling = handlingSliders(src.model, base[first], drive, first);
-    t.handlingNote = t.handling.length ? handlingNote(drive, first) : '';
+    // Cornering: the position Optimize used for this car and tab (the default on a front-wheel-drive car), on the grid of stops
+    const drive = drivetrainOf(driveShare(src.model));
+    t.feel[HANDLING_KEY] = balanceOf(handlingOf(t.feel, drive, first));
+    t.handling = handlingControl(src.model, base[first], drive, first);
+    if (t.handling) t.feel[HANDLING_KEY] = Math.max(t.handling.min, Math.min(t.handling.max, t.feel[HANDLING_KEY]));
     // a range input with no value sits in the middle of its box; 0 (= as now) is the left or right end on a one-sided slider
     for (const sl of t.sliders) t.feel[sl.key] = t.feel[sl.key] ?? 0;
   };
 
-  $scope.tunerFeel = function (changed?: string): void {
+  $scope.tunerCornerReset = function (): void {
+    if (!t.handling) return;
+    t.feel[t.handling.key] = t.handling.start;
+    $scope.tunerFeel();
+  };
+
+  $scope.tunerFeel = function (): void {
     if (!src || !results.length || t.busy) return;
-    // the two handling sliders use the same rows in opposite directions: the one that moved switches the other off
-    if (changed === HANDLING_KEYS.stable && t.feel[changed] > 0) t.feel[HANDLING_KEYS.push] = 0;
-    if (changed === HANDLING_KEYS.push && t.feel[changed] > 0) t.feel[HANDLING_KEYS.stable] = 0;
     const view = t.cards[t.card];
     if (!view) return;
     for (const setup of view.setups) {
