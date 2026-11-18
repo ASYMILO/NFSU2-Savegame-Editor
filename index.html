@@ -173,8 +173,8 @@
           <span class="muted">One copy with all 5 race types and your driving sliders.<span ng-if="tuner.how === 'hand'"> It holds exactly what the keys below give.</span> Load it in the game. Your loaded file is not changed. Keep your original backup.</span>
         </div>
         <details class="tuner-handling" ng-if="tuner.handling">
-          <summary class="tuner-screen-head"><strong>Cornering</strong>:
-            {{ (tuner.handling.stops[(tuner.feel[tuner.handling.key] + 100) / 25] || tuner.handling.stops[4]).name }}{{ tuner.feel[tuner.handling.key] === tuner.handling.pick ? " (Tuner's pick)" : '' }}.
+          <summary class="tuner-screen-head"><span><strong>Cornering</strong>:
+            {{ (tuner.handling.stops[(tuner.feel[tuner.handling.key] + 100) / 25] || tuner.handling.stops[4]).name }}{{ tuner.feel[tuner.handling.key] === tuner.handling.pick ? " (Tuner's pick)" : '' }}.</span>
             <span class="link-btn">Change</span></summary>
           <p class="muted">{{ tuner.handling.intro }}</p>
           <div class="tuner-feel">
