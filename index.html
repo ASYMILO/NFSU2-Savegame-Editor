@@ -204,7 +204,7 @@
             <details class="tuner-why"><summary>What it changes</summary><small class="muted">{{ tuner.handling.basis }}</small></details>
           </div>
           <p class="corner-foot"><span>Changes keys on two screens below: Suspension and Tires &amp; Brakes. Brake Bias is also moved by the Braking slider below.</span>
-            <span>Not kept: next time {{ tuner.handling.start === 0 ? 'it is back in the middle' : "the Tuner's pick for your car comes back" }}.</span>
+            <span>If you move it, this browser keeps the position for this car and this race type.</span>
             <button type="button" class="link-btn" ng-if="tuner.feel[tuner.handling.key] !== tuner.handling.start" ng-click="tunerCornerReset()" ng-disabled="tuner.busy">{{ tuner.handling.start === 0 ? 'Back to as it is' : (tuner.handling.pick !== null ? "Back to the Tuner's pick" : "Back to where the Tuner put it") }}</button></p>
         </details>
         <details class="hand-older tuner-advanced">

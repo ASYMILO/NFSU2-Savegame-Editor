@@ -15,8 +15,8 @@ import { gameNumbers, rollPull, type GameNumbers } from '../model/legal-opt.js';
 import { ROW_LABELS, ROW_ORDER, shownText } from '../model/hand-input.js';
 import { NitroScreen, rowInfo } from '../model/tune-keys.js';
 import { FEEL_SLIDERS, feelSliders, withFeel, type Feel } from '../model/feel.js';
-import { advancedRows, CHECK_TABS, gripChecks, DRIVE_WORDS, driveShare, drivetrainOf, balanceOf, handlingControl, HANDLING_KEY, handlingOf, withHandling } from '../model/handling.js';
-import { clearPrefs, loadPrefs, savePrefs } from './browser-store.js';
+import { advancedRows, CHECK_TABS, gripChecks, DRIVE_WORDS, driveShare, drivetrainOf, balanceOf, handlingControl, handlingDefault, HANDLING_KEY, handlingOf, withHandling } from '../model/handling.js';
+import { clearPrefs, loadPrefs, MAX_CORNERS, savePrefs } from './browser-store.js';
 import {
   cardNote, categoryScreens, gapWords, GOAL_WORDS, goalChoices, groupTabs, largestGap, legalOptions, lockedWhatIf, optimizeTab, planTab, PREFERENCES, saveWithTabs, SCREENS, screenPlans, SETUP_COUNT, startAfterC, stepCause,
   TAB_NAMES, TAB_USES, TUNED, tunerSteps, type Preference, type TabResult,
@@ -74,13 +74,37 @@ export function attachTuner($scope: EditorScope, api: TunerApi): () => void {
   let base: Uint8Array[] = [];
   // the choices kept in this browser (browser-store.ts): goal and slider positions per tab, and A or B
   const goalKeys = PREFERENCES.map((p) => p.key), feelKeys = FEEL_SLIDERS.map((f) => f.key);
-  const kept = (): { how: 'save' | 'hand'; goals: Preference[]; feels: Feel[]; units: 'kmh' | 'mph' } => {
+  const kept = (): { how: 'save' | 'hand'; goals: Preference[]; feels: Feel[]; units: 'kmh' | 'mph'; corners: Record<string, number> } => {
     const p = loadPrefs(goalKeys, feelKeys);
-    return { how: p?.how ?? 'save', goals: (p?.goals ?? new Array(SETUP_COUNT).fill('race')) as Preference[], feels: p?.feels ?? [], units: p?.units ?? 'kmh' };
+    return { how: p?.how ?? 'save', goals: (p?.goals ?? new Array(SETUP_COUNT).fill('race')) as Preference[], feels: p?.feels ?? [], units: p?.units ?? 'kmh', corners: p?.corners ?? {} };
+  };
+  // Cornering positions the player moved off the Tuner's start, by "carHash:tab" (kept per car and tab, item 10)
+  let corners = kept().corners;
+  const cornerKey = (hash: number, setup: number): string => `${hash}:${setup}`;
+  /** Put the kept Cornering positions of this car into the tabs' slider records, unless this session already set one. */
+  const loadCorners = (hash: number): void => {
+    for (let setup = 0; setup < SETUP_COUNT; setup++) {
+      const v = corners[cornerKey(hash, setup)];
+      feels[setup] = feels[setup] ?? {};
+      if (v !== undefined && feels[setup][HANDLING_KEY] === undefined) feels[setup][HANDLING_KEY] = v;
+    }
+  };
+  /** Remember the positions that differ from the Tuner's start for the car on show; a position back at the start is forgotten. */
+  const keepCorners = (): void => {
+    if (!src || !t.cards.length) return; // no cards: the slider records may belong to another car than `src`
+    const drive = drivetrainOf(driveShare(src.model));
+    for (let setup = 0; setup < SETUP_COUNT; setup++) {
+      const v = feels[setup]?.[HANDLING_KEY], k = cornerKey(src.hash, setup);
+      delete corners[k];
+      if (v === undefined) continue; // no record = the Tuner's own start
+      if (v !== balanceOf(handlingDefault(drive, setup))) corners[k] = v;
+    }
+    const keys = Object.keys(corners);
+    for (const k of keys.slice(0, Math.max(0, keys.length - MAX_CORNERS))) delete corners[k];
   };
   let goals = kept().goals;
   let feels: Feel[] = kept().feels;
-  const keep = (): void => savePrefs({ how: t.source === 'save' ? t.how : kept().how, goals, feels: Array.from({ length: SETUP_COUNT }, (_, k) => feels[k] ?? {}), units: t.units });
+  const keep = (): void => savePrefs({ how: t.source === 'save' ? t.how : kept().how, goals, feels: Array.from({ length: SETUP_COUNT }, (_, k) => feels[k] ?? {}), units: t.units, corners: (keepCorners(), corners) });
   t.units = speedUnit = kept().units;
   let results: TabResult[] = [];
   let src: Source | null = null;
@@ -286,18 +310,16 @@ export function attachTuner($scope: EditorScope, api: TunerApi): () => void {
     for (const sl of t.sliders) t.feel[sl.key] = t.feel[sl.key] ?? 0;
   };
 
-  $scope.tunerCornerReset = function (): void {
-    if (!t.handling) return;
-    t.feel[t.handling.key] = t.handling.start;
-    $scope.tunerFeel();
-  };
+  /** Back to the Tuner's own start: each tab of the card gets ITS default (they differ: Circuit has a dose on a front-wheel-drive car, URL has none). */
+  $scope.tunerCornerReset = function (): void { $scope.tunerFeel(true); };
 
-  $scope.tunerFeel = function (): void {
+  $scope.tunerFeel = function (reset = false): void {
     if (!src || !results.length || t.busy) return;
     const view = t.cards[t.card];
     if (!view) return;
     for (const setup of view.setups) {
       feels[setup] = { ...t.feel };
+      if (reset) delete feels[setup][HANDLING_KEY];
       results[setup] = plan(src, setup, results[setup].legalSheet);
     }
     keep();
@@ -318,6 +340,7 @@ export function attachTuner($scope: EditorScope, api: TunerApi): () => void {
     clearPrefs();
     goals = new Array(SETUP_COUNT).fill('race');
     feels = [];
+    corners = {};
     if (t.source === 'save') t.how = 'save';
     t.units = speedUnit = 'kmh';
     refreshNow();
@@ -340,6 +363,7 @@ export function attachTuner($scope: EditorScope, api: TunerApi): () => void {
     clear(false, keepView && t.cards.length > 0);
     if (typeof s === 'string') { t.error = s; return; }
     const token = runToken, pref = goals.slice();
+    loadCorners(s.hash);
     const save = api.save();
     const fresh: TabResult[] = [], nextBase: Uint8Array[] = [];
     const keyOf = (setup: number): string =>

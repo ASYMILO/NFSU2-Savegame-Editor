@@ -454,7 +454,7 @@ export interface EditorScope extends angular.IScope {
   tunerHow(): void;
   /** km/h or mph changed (kept in this browser). */
   tunerUnits(): void;
-  tunerFeel(): void;
+  tunerFeel(reset?: boolean): void;
   /** Put the Cornering slider back to where Optimize started it for this car and tab. */
   tunerCornerReset(): void;
   tunerTab(card: number): void;

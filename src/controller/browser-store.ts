@@ -43,7 +43,15 @@ export interface TunerPrefs {
   feels: Record<string, number>[];
   /** Top speed in km/h or mph, as the game is set. */
   units: 'kmh' | 'mph';
+  /**
+   * Cornering slider position (-100..100, steps of 25) where the player moved it off the Tuner's own start, by "carHash:tab".
+   * Per car and tab, not per tab: another car has its own drivetrain and default (narada-tuner-whole.md item 10, audit m9).
+   */
+  corners: Record<string, number>;
 }
+
+/** shortcut: at most this many cars-and-tabs are kept (oldest dropped first); raise it if players tune more cars than that. */
+export const MAX_CORNERS = 100;
 
 /** Reads stored choices; anything malformed is dropped (the text comes from the browser, it may be old or edited). */
 export function parsePrefs(text: string | null, goalKeys: readonly string[], feelKeys: readonly string[]): TunerPrefs | null {
@@ -53,7 +61,14 @@ export function parsePrefs(text: string | null, goalKeys: readonly string[], fee
   const o = raw as Record<string, unknown>;
   const goals = Array.isArray(o.goals) ? o.goals : [];
   const feels = Array.isArray(o.feels) ? o.feels : [];
+  const corners: Record<string, number> = {};
+  if (o.corners && typeof o.corners === 'object') {
+    for (const [k, v] of Object.entries(o.corners as Record<string, unknown>).slice(-MAX_CORNERS)) {
+      if (/^\d+:[0-4]$/.test(k) && typeof v === 'number' && Number.isFinite(v)) corners[k] = Math.round(Math.max(-100, Math.min(100, v)) / 25) * 25;
+    }
+  }
   return {
+    corners,
     how: o.how === 'hand' ? 'hand' : 'save',
     units: o.units === 'mph' ? 'mph' : 'kmh',
     goals: Array.from({ length: 5 }, (_, k) => (typeof goals[k] === 'string' && goalKeys.includes(goals[k] as string) ? goals[k] as string : 'race')),

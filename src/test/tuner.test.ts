@@ -35,7 +35,11 @@ test('each tab offers its own goal first and no goal twice (Street X = accelerat
 test('stored Tuner choices: malformed parts are dropped, slider positions clamped, no other keys kept', () => {
   assert.equal(parsePrefs('not json', ['race'], ['stiff']), null);
   const p = parsePrefs(JSON.stringify({ how: 'hand', goals: ['top', 'bogus'], feels: [{ stiff: 250, other: 5 }, null], save: [1, 2] }), ['race', 'top'], ['stiff'])!;
-  assert.deepEqual(p, { how: 'hand', units: 'kmh', goals: ['top', 'race', 'race', 'race', 'race'], feels: [{ stiff: 100 }, {}, {}, {}, {}] });
+  assert.deepEqual(p, { corners: {}, how: 'hand', units: 'kmh', goals: ['top', 'race', 'race', 'race', 'race'], feels: [{ stiff: 100 }, {}, {}, {}, {}] });
+  // item 10: Cornering positions by car and tab: malformed keys and values dropped, clamped, snapped to the stops
+  const c = parsePrefs(JSON.stringify({ corners: { '123:0': -50, '123:1': 900, '45:4': 30, 'x:0': 25, '1:9': 25, '2:0': 'a' } }), [], [])!.corners;
+  assert.deepEqual(c, { '123:0': -50, '123:1': 100, '45:4': 25 });
+  assert.deepEqual(parsePrefs('{"corners":5}', [], [])!.corners, {});
   assert.equal(parsePrefs('{"how":"x"}', ['race'], [])!.how, 'save');
   assert.equal(parsePrefs('{"units":"mph"}', ['race'], [])!.units, 'mph');
   assert.equal(parsePrefs('{"units":"furlongs"}', ['race'], [])!.units, 'kmh');
