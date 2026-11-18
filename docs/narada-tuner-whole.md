@@ -136,3 +136,67 @@ Cost to measure (estimates; base: one ladder run is about 15-17 min, laps Step 1
 | A. Front bites at 25 % and 75 %, 3 front-drive cars (Civic Si, Peugeot 106, Golf), short circuit layout c, full ladder. The Civic and Peugeot base / half / full must be re-run on the port with the Step 20 ladder fix | 6 new + 6 re-runs | **1.5-2 hours** | **Yes.** It shows where the spin starts and whether the gain has a dip. Repeats on this track are frame-exact, so one run each |
 | B. Every car, both sides, 25 % and 75 %, two tracks | about 48 + new bases; Freemont needs repeats (noise 0.10-0.12 s a lap) | 8-12 hours | No. Rear-drive and all-wheel-drive cars show no lap change at half, so 25 % cannot show one |
 | C. A real continuous prediction | a model of the car at its limit, checked on laps | not known | No. We have no such model and the limit jumps |
+
+## 5. Question 3: the whole flow and page
+
+Judged from `docs/img/r3q-civic-fwd-circuit-keys.png` (Civic, front-wheel drive, Circuit, "with keys"; 1280 x 4131 px), the other `r3q-*` pictures and the code at cab30a0.
+
+**Correction to the short answer in section 1:** 4100 px is the height of the whole Tuner page, not of one card. The Circuit card alone is about 2750 px (measured on the picture: from the card title to "All keys as a list"). The point stands: the first key to press is about 1100 px under the result table (the "50-120 mph pull" row to the first "Front Springs" box, measured on the same picture), and an optional block fills that gap.
+
+### 5.1 The flow
+
+| Step | Today | Verdict |
+|---|---|---|
+| Save editor first, Tuner from a car slot | "Back to the save editor" on top; car picked from the save | **Right.** Matches the owner's order (save -> car -> tuning) |
+| Car, then "Find best setup", then one card per race type | one button for all 5 tabs, 20-50 s, progress bar | **Right** |
+| Save-only or keys | two boxes, "Fair play" line above | **Right** |
+| Card: goal -> result table -> download -> Cornering -> Advanced -> game screens in menu order | as listed | **Order wrong in one place:** the optional Cornering block sits between the result and the first key. A player who only wants the keys scrolls past two sliders, their evidence and a long note |
+
+### 5.2 Problems on the page, ranked
+
+| # | Problem | Proof | Harm | Fix | Cost (estimate) |
+|---|---|---|---|---|---|
+| P1 | The text under "Find best setup" says the four handling rows move "on Circuit and URL". They move on Circuit only | `index.html` l.126 against `DOSE_TABS = [0]` (`src/model/handling.ts` l.62); laps Step 21.1: URL card "both sliders 0 %" | A false sentence on the first screen a player reads | Say "on the Circuit tab (also used by Sprint and career URL races)" | 10 min |
+| P2 | Suspension and Tires & Brakes say "From your sliders below." when the steps come from Optimize's own handling move (front-wheel drive, Circuit) and no slider was touched | `src/model/tuner.ts` l.358: every screen not in `TUNED` gets that text when it has steps; picture: Steering and Braking sliders in the middle, yet 3 Suspension steps and Brake Bias 7 presses | The player is told they caused it; the cause (the Cornering pick) is 1000 px above | Pass the cause into `screenPlans`: "From the corner setting above" / "From your sliders below" / both | 30-45 min + one test |
+| P3 | The Drag card does not show the quarter mile it optimizes. Its goal line says "the shortest quarter mile"; the table shows 0-60, 0-100, top, power | `GOAL_WORDS.drag` (`tuner.ts` l.38), `OBJECTIVES.drag` quarter weight 1.0 (`legal-opt.ts` l.12); `cards()` adds only the pull row (`tuner-controller.ts` l.508-510); `gameNumbers().quarter` exists (`legal-opt.ts` l.524, used `hand-input.ts` l.286). Same defect as audit M6, which was fixed for Circuit and URL only | "Best" can look no better on every visible row | Add a "Quarter mile" row on the Drag card (Now / With keys / Best) and use it first in the gap line, as for the pull. Keep the card's existing note that the dyno shifts by itself and a Drag race does not (audit M7) | 1 h + one test |
+| P4 | The optional Cornering block (about 1100 px) sits between the result and the first key | picture, see above; `index.html` l.176-192 | Long scroll; the user role's condition ("shorter, not longer") fails today | Fold it to one line that shows where it stands ("Corners: front bites, half (Tuner's pick). Change") and opens on click | 1 h + a screenshot check |
+| P5 | "Brake Bias is also moved by the Braking slider above." The Braking slider is below (Tires & Brakes block) | `index.html` l.191; picture | Small, but a wrong pointer | "below" | 2 min |
+| P6 | Evidence line for front-wheel drive "rear holds": "Two front-drive test cars tried it". Still true for that side; the Golf drove only "front bites". Open item 3 in `handoff-post-audit.md` is about this line | `handling.ts` l.221; laps Step 20.3 | None once checked: the Golf is not a "rear holds" car | **No change.** Close open item 3 | 0 |
+| P7 | "nie zmierzone" (Polish) appears on the English page | `NOT_MEASURED` (`handling.ts` l.179), shown in `index.html` l.183-187 and in `handlingNote` l.173 | Mixed language for non-Polish players | Ask the owner: the word came from the audit fix (M7) in the owner's language | 0 (a question) |
+| P8 | The ECU and Turbo charts are about 600 px each | picture | Long, but they are the steps themselves | **Keep.** No shorter form shows 9 bars of presses | 0 |
+
+Not a problem: the "50-120 mph pull" row and the gap line now agree (laps Step 21.1); car choice, km/h / mph, keys or save and goals are kept in the browser.
+
+### 5.3 Roles on question 3
+
+- 🔧 Builder: P1, P2, P3, P5 are page text or one table row; P4 is one `<details>` plus a summary line. No model change.
+- ⚠️ Sceptic: P2 is worse than it looks: once the 9-stop slider ships, more players get steps they did not cause, and "your sliders" is then wrong on two screens for every front-drive Circuit card.
+- 👤 User: P4 first in feel, P1 first in trust. A wrong sentence on the first screen costs more than a long scroll.
+- 💰 Cost: P1-P5 together about 3-3.5 hours (estimate), no game time.
+
+## 6. One ranked change list
+
+Ranked by harm to a player first, then by cost. "Game runs" = needs laps or a game check before it can ship.
+
+| # | What | Why | Evidence | Cost (estimate) | Game runs? |
+|---|---|---|---|---|---|
+| 1 | Fix the three false or misleading page texts: "Circuit and URL" (P1), "From your sliders below" for the Tuner's own move (P2), "slider above" (P5) | A player reads a wrong cause or a wrong race type | `index.html` l.126, l.191; `tuner.ts` l.358; `handling.ts` l.62 | 1 h | no |
+| 2 | Correct the Cornering evidence: the three wrong cells and the "25 / 75 % never driven" sentence in `narada-handling-ui.md` 3.4; add the "rear holds, full" lines for FWD / RWD / AWD to `FINDINGS` | The 5-stop decision rested on them; the page has the same gap | section 3.1; laps Steps 14.3, 14.4, 15.4 | 1 h | no |
+| 3 | Drag card: a "Quarter mile" row and the gap line on it (P3) | The card hides the one number it optimizes | `tuner.ts` l.38, `legal-opt.ts` l.12, l.524, `tuner-controller.ts` l.508-510; audit M6 | 1 h | no |
+| 4 | Cornering: 9 stops (steps of 25 %), one line per stop ("driven" with its result, or "between two driven setups; not driven itself"); "Tuner's pick" only on a driven stop; front-wheel drive "three quarters, front bites" carries the warning of the full stop | Finer choice that is exact in bytes; nothing claimed that was not driven | section 4; laps Steps 14.3-20.3; `withHandling` straight-line rows | 2-3 h | no |
+| 5 | Fold the Cornering block to one line with its current position (P4) | First key 1100 px under the result | picture `r3q-civic-fwd-circuit-keys.png` | 1 h | no |
+| 6 | One line in the front-drive Circuit note: this tab is also loaded by Sprint and career URL races; Sprint was never driven, one URL test showed no gain | The dose reaches races nobody tested | `TAB_USES` (`tuner.ts`); laps Step 20.3 (-0.08 s / +0.18 s) | 15 min | no |
+| 7 | Steering and Braking: "test car 3000GT" in the visible line, not only under "What it changes" | One car's numbers shown to every car | `feel.ts` l.58-66; `game-check-r3i.md` C | 15 min | no |
+| 8 | Grip / downforce check line on Circuit and URL: when tire grip or downforce is below the top of its range, "put it back to the top: lower gives no top speed" | The only high-speed fix the code supports; a slider could only make it worse | `FUN_0059e620`, `game-check-r3h.md` B, C; `setup-bytes.md` A.5 | 1-2 h | no (the rule is game code; the size quoted is one test car) |
+| 9 | Drift and Street X cards: "Engine only. Handling not measured for this race; the race changes grip itself" | Nothing measured on a circuit carries over | `FUN_005b4dc0` presets; `setup-bytes.md` B; audit M7 | 15 min | no |
+| 10 | Keep the Cornering position per car and tab | A player who switched it off gets the pick back every visit | audit m9; `index.html` l.191 says it is not kept | 1 h | no |
+| 11 | Laps round A: front bites at 25 % and 75 % on Civic Si, Peugeot 106, Golf, short circuit layout c; re-run their base / half / full on the Step 20 ladder | Where the spin starts; turns stops 3 and 7 on the front side from "not driven" into results | section 4.3 | 1.5-2 h game time | **yes** |
+| 12 | One human lap per drivetrain: factory against the Tuner's set, 3 laps, same car, twice | No person ever drove behind any of this (audit M3) | `handoff-post-audit.md` open 5 | about 1 h of the owner's time | **yes** (owner) |
+| 13 | Drag: a scripted redline-shift quarter mile, factory against the Drag tab set | The dyno shifts by itself; a Drag race does not (audit M7) | audit M7 fix | about 1 h (estimate) | **yes** |
+| 14 | Street X fixed-line driver and a drift score read from memory | Without them the Street X and Drift goals stay our own idea | laps Step 21.3 (SD 0.2-0.7 s); audit M7 | not known, several hours | **yes** |
+| 15 | Trim "Higher top speed" from the Drag and Drift goal choices, or say it was not tested there | Offered where nobody showed it fits | `goalChoices` (`tuner.ts` l.27-30) | 15 min | no |
+| 16 | Ask the owner about "nie zmierzone" on the English page (P7) | Mixed language | `handling.ts` l.179 | 0 | no |
+
+Not on the list, on purpose: a bumps / kerbs control (the one jump test failed, section 3.2), a "safe or fast" style switch (it is the Cornering slider), a continuous slider (section 4.2), shorter ECU / Turbo charts (P8).
+
+Items 1-10 together: about 8.5-10.5 hours of page work (estimate), no game time. Item 11 is the one game round worth doing before the slider ships its 25 % and 75 % front stops as "driven".
